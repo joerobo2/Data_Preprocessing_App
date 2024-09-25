@@ -212,7 +212,20 @@ def multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
         f"ax.set_ylabel('{numerical_cols[1]}')\n"
         f"ax.set_title('KMeans Clustering')"
     ))
-
+# Function for statistical analysis
+def statistical_analysis(df, numerical_cols, categorical_cols, notebook_cells):
+    """Perform statistical analysis and add results to notebook cells."""
+    for num_col in numerical_cols:
+        for cat_col in categorical_cols:
+            # Example statistical test (t-test)
+            groups = [df[num_col][df[cat_col] == cat_val] for cat_val in df[cat_col].unique()]
+            if len(groups) == 2:  # Ensure there are two groups for t-test
+                t_stat, p_value = stats.ttest_ind(*groups)
+                # Log the results in the notebook cells
+                notebook_cells.append(nbformat.v4.new_code_cell(f"""
+# Statistical Analysis Results for {num_col} vs {cat_col}
+t-statistic: {t_stat}, p-value: {p_value}
+"""))
 
 # Function for exporting notebook cells
 def export_notebook_cells(notebook_cells, filepath):
@@ -237,17 +250,17 @@ def main():
         # Add dataset reading cell
         notebook_cells.append(nbformat.v4.new_code_cell("df = pd.read_csv('uploaded_file.csv')"))
         
-        df = import_notebook(uploaded_file)  # This line is updated to handle uploaded_file correctly
+        df = import_notebook(uploaded_file)  # Ensure you have this function defined
         columns_to_drop = st.multiselect("Select columns to drop:", df.columns.tolist())
 
-        df, categorical_cols, numerical_cols = preprocess_data(df, notebook_cells, columns_to_drop)
+        df, categorical_cols, numerical_cols = preprocess_data(df, notebook_cells, columns_to_drop)  # Ensure this function is defined
         
         # Checkboxes for analysis functions
         if st.checkbox("Perform Univariate Analysis"):
-            univariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
+            univariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)  # Ensure this is defined
         
         if st.checkbox("Perform Multivariate Analysis"):
-            multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
+            multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)  # Ensure this is defined
         
         if st.checkbox("Perform Clustering Analysis"):
             multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)  # Reuse for clustering analysis
