@@ -213,30 +213,59 @@ def multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
         f"ax.set_title('KMeans Clustering')"
     ))
 
-# Statistical Analysis Function
 def statistical_analysis(df, numerical_cols, categorical_cols, notebook_cells):
     """Perform statistical analysis and add results to notebook cells."""
-    results_summary = []  # Initialize results_summary
+    
+    # Initialize lists to store results
+    ttest_results = []
+    anova_results = []
 
+    # T-test analysis
     for num_col in numerical_cols:
         for cat_col in categorical_cols:
             # Example statistical test (t-test)
             groups = [df[num_col][df[cat_col] == cat_val] for cat_val in df[cat_col].unique()]
             if len(groups) == 2:  # Ensure there are two groups for t-test
                 t_stat, p_value = stats.ttest_ind(*groups)
-                result_message = f"# Statistical Analysis Results for {num_col} vs {cat_col}\n" \
-                                 f"t-statistic: {t_stat}, p-value: {p_value}"
-                
-                # Log the results in the notebook cells
-                notebook_cells.append(nbformat.v4.new_code_cell(result_message))
-                
-                # Append the result message to results_summary for later display
-                results_summary.append(result_message)
+                ttest_results.append({
+                    "Numerical Column": num_col,
+                    "Categorical Column": cat_col,
+                    "t-statistic": t_stat,
+                    "p-value": p_value
+                })
 
-    # Display summary of results
-    st.write("**Statistical Analysis Summary**")
-    for result in results_summary:
-        st.markdown(result)
+    # ANOVA analysis
+    for num_col in numerical_cols:
+        for cat_col in categorical_cols:
+            # Example statistical test (ANOVA)
+            groups = [df[num_col][df[cat_col] == cat_val] for cat_val in df[cat_col].unique()]
+            if len(groups) > 1:  # Ensure there are more than one group for ANOVA
+                f_stat, p_value = stats.f_oneway(*groups)
+                anova_results.append({
+                    "Numerical Column": num_col,
+                    "Categorical Column": cat_col,
+                    "F-statistic": f_stat,
+                    "p-value": p_value
+                })
+
+    # Display summary of t-test results in a table
+    if ttest_results:
+        st.write("**T-test Results Summary**")
+        ttest_df = pd.DataFrame(ttest_results)
+        st.table(ttest_df)
+
+    # Display summary of ANOVA results in a table
+    if anova_results:
+        st.write("**ANOVA Results Summary**")
+        anova_df = pd.DataFrame(anova_results)
+        st.table(anova_df)
+
+    # Append results to notebook cells
+    notebook_cells.append(nbformat.v4.new_markdown_cell("## T-test Results"))
+    notebook_cells.append(nbformat.v4.new_code_cell("import pandas as pd\n" + ttest_df.to_string(index=False)))
+    
+    notebook_cells.append(nbformat.v4.new_markdown_cell("## ANOVA Results"))
+    notebook_cells.append(nbformat.v4.new_code_cell("import pandas as pd\n" + anova_df.to_string(index=False)))
 
 # Main function for the Streamlit app
 def main():
