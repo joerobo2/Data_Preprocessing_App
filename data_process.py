@@ -206,13 +206,13 @@ def clustering_analysis(df, numerical_cols, notebook_cells):
 
     # Append code to notebook cells
     notebook_cells.append(nbformat.v4.new_code_cell(f"""
-import pandas as pd
-from sklearn.cluster import KMeans
+    import pandas as pd
+    from sklearn.cluster import KMeans
 
-num_clusters = {num_clusters}
-kmeans = KMeans(n_clusters=num_clusters)
-kmeans.fit(df[{numerical_cols}])
-df['Cluster'] = kmeans.labels_
+    num_clusters = {num_clusters}
+    kmeans = KMeans(n_clusters=num_clusters)
+    kmeans.fit(df[{numerical_cols}])
+    df['Cluster'] = kmeans.labels_
 """"))
     
 def create_notebook(notebook_cells):
