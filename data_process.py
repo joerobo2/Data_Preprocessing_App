@@ -160,57 +160,108 @@ def t_test(df, categorical_cols, numerical_cols):
             else:
                 st.warning("T-test requires exactly two groups in the selected categorical column.")
 
-# Function for clustering analysis with elbow method
+# Function for univariate analysis
+def univariate_analysis(df, numerical_cols, notebook_cells):
+    st.write("**Univariate Analysis**")
+
+    if len(numerical_cols) > 0:
+        selected_col = st.selectbox("Select numerical column for Univariate Analysis", numerical_cols)
+        
+        if st.button("Run Univariate Analysis"):
+            fig, ax = plt.subplots()
+            sns.histplot(df[selected_col], kde=True, ax=ax)
+            ax.set_title(f'Univariate Analysis of {selected_col}')
+            st.pyplot(fig)
+
+            # Append notebook cell for univariate analysis
+            notebook_cells.append(nbformat.v4.new_code_cell(
+                f"sns.histplot(df['{selected_col}'], kde=True)\n"
+                f"plt.title('Univariate Analysis of {selected_col}')\n"
+                "plt.show()"
+            ))
+
+# Function for bivariate analysis
+def bivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
+    st.write("**Bivariate Analysis**")
+
+    if len(categorical_cols) > 0 and len(numerical_cols) > 0:
+        selected_cat = st.selectbox("Select categorical column for Bivariate Analysis", categorical_cols)
+        selected_num = st.selectbox("Select numerical column for Bivariate Analysis", numerical_cols)
+        
+        if st.button("Run Bivariate Analysis"):
+            fig, ax = plt.subplots()
+            sns.boxplot(x=df[selected_cat], y=df[selected_num], ax=ax)
+            ax.set_title(f'Bivariate Analysis of {selected_num} by {selected_cat}')
+            st.pyplot(fig)
+
+            # Append notebook cell for bivariate analysis
+            notebook_cells.append(nbformat.v4.new_code_cell(
+                f"sns.boxplot(x=df['{selected_cat}'], y=df['{selected_num}'])\n"
+                f"plt.title('Bivariate Analysis of {selected_num} by {selected_cat}')\n"
+                "plt.show()"
+            ))
+
+# Function for multivariate analysis
+def multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
+    st.write("**Multivariate Analysis**")
+
+    if len(categorical_cols) > 0 and len(numerical_cols) > 0:
+        selected_cat = st.selectbox("Select categorical column for Multivariate Analysis", categorical_cols)
+        
+        if st.button("Run Multivariate Analysis"):
+            fig, ax = plt.subplots(figsize=(12, 6))
+            sns.violinplot(x=df[selected_cat], y=df[numerical_cols[0]], data=df, ax=ax)
+            ax.set_title(f'Multivariate Analysis of {numerical_cols[0]} by {selected_cat}')
+            st.pyplot(fig)
+
+            # Append notebook cell for multivariate analysis
+            notebook_cells.append(nbformat.v4.new_code_cell(
+                f"sns.violinplot(x=df['{selected_cat}'], y=df['{numerical_cols[0]}'])\n"
+                f"plt.title('Multivariate Analysis of {numerical_cols[0]} by {selected_cat}')\n"
+                "plt.show()"
+            ))
+
+# Clustering Analysis
 def clustering_analysis(df, numerical_cols, notebook_cells):
     st.write("**Clustering Analysis**")
 
-    # Selecting the number of clusters for KMeans
-    max_k = st.slider("Select maximum number of clusters (k)", min_value=1, max_value=10, value=3)
+    if len(numerical_cols) > 0:
+        k = st.slider("Select number of clusters (k)", min_value=1, max_value=10, value=3)
+        
+        if st.button("Run Clustering Analysis"):
+            kmeans = KMeans(n_clusters=k, random_state=42)
+            df['Cluster'] = kmeans.fit_predict(df[numerical_cols])
+            inertia = kmeans.inertia_
+            
+            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+            ax1.plot(range(1, 11), inertia, marker='o')
+            ax1.set_title('Elbow Method for Optimal k')
+            ax1.set_xlabel('Number of clusters (k)')
+            ax1.set_ylabel('Inertia')
+            ax2.scatter(df[numerical_cols[0]], df[numerical_cols[1]], c=df['Cluster'], cmap='viridis')
+            ax2.set_title(f'KMeans Clustering Results (k={k})')
+            ax2.set_xlabel(numerical_cols[0])
+            ax2.set_ylabel(numerical_cols[1])
+            st.pyplot(fig)
 
-    # Elbow method to find the optimal number of clusters
-    inertia = []
-    for k in range(1, max_k + 1):
-        kmeans = KMeans(n_clusters=k, random_state=0)
-        kmeans.fit(df[numerical_cols])
-        inertia.append(kmeans.inertia_)
-
-    # Create subplots for elbow chart and cluster scatter plot
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
-
-    # Elbow Chart
-    ax1.plot(range(1, max_k + 1), inertia, marker='o')
-    ax1.set_title('Elbow Method for Optimal k')
-    ax1.set_xlabel('Number of clusters (k)')
-    ax1.set_ylabel('Inertia')
-
-    # KMeans clustering and scatter plot
-    k = st.slider("Select number of clusters for KMeans", min_value=1, max_value=max_k, value=3)
-    kmeans = KMeans(n_clusters=k, random_state=0)
-    df['Cluster'] = kmeans.fit_predict(df[numerical_cols])
-
-    ax2.scatter(df[numerical_cols[0]], df[numerical_cols[1]], c=df['Cluster'], cmap='viridis', marker='o', edgecolor='k')
-    ax2.set_title(f'KMeans Clustering Results (k={k})')
-    ax2.set_xlabel(numerical_cols[0])
-    ax2.set_ylabel(numerical_cols[1])
-
-    st.pyplot(fig)
-
-    # Append notebook cell for clustering analysis
-    notebook_cells.append(nbformat.v4.new_code_cell(
-        f"for k in range(1, {max_k + 1}):\n"
-        f"    kmeans = KMeans(n_clusters=k)\n"
-        f"    kmeans.fit(df[numerical_cols])\n"
-        f"    inertia.append(kmeans.inertia_)\n"
-        "fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))\n"
-        "ax1.plot(range(1, max_k + 1), inertia, marker='o')\n"
-        f"ax1.set_title('Elbow Method for Optimal k')\n"
-        f"ax1.set_xlabel('Number of clusters (k)')\n"
-        f"ax1.set_ylabel('Inertia')\n"
-        f"ax2.scatter(df[numerical_cols[0]], df[numerical_cols[1]], c=df['Cluster'], cmap='viridis')\n"
-        f"ax2.set_title(f'KMeans Clustering Results (k={k})')\n"
-        f"ax2.set_xlabel(numerical_cols[0])\n"
-        f"ax2.set_ylabel(numerical_cols[1])"
-    ))
+            # Append notebook cell for clustering analysis
+            notebook_cells.append(nbformat.v4.new_code_cell(
+                f"kmeans = KMeans(n_clusters={k}, random_state=42)\n"
+                f"df['Cluster'] = kmeans.fit_predict(df[{numerical_cols}])\n"
+                f"inertia = kmeans.inertia_\n"
+                f"plt.figure(figsize=(12, 5))\n"
+                f"plt.subplot(1, 2, 1)\n"
+                f"plt.plot(range(1, 11), inertia, marker='o')\n"
+                f"plt.title('Elbow Method for Optimal k')\n"
+                f"plt.xlabel('Number of clusters (k)')\n"
+                f"plt.ylabel('Inertia')\n"
+                f"plt.subplot(1, 2, 2)\n"
+                f"plt.scatter(df[{numerical_cols[0]}], df[{numerical_cols[1]}], c=df['Cluster'], cmap='viridis')\n"
+                f"plt.title('KMeans Clustering Results (k={k})')\n"
+                f"plt.xlabel('{numerical_cols[0]}')\n"
+                f"plt.ylabel('{numerical_cols[1]}')\n"
+                "plt.show()"
+            ))
 
 def main():
     st.title("Exploratory Data Analysis App")
@@ -230,21 +281,29 @@ def main():
             columns_to_drop = st.multiselect("Select columns to drop", df.columns.tolist())
             df, categorical_cols, numerical_cols = preprocess_data(df, notebook_cells, columns_to_drop)
 
+            # Univariate Analysis
+            univariate_analysis(df, numerical_cols, notebook_cells)
+
+            # Bivariate Analysis
+            bivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
+
+            # Multivariate Analysis
+            multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
+
+            # Clustering Analysis
+            clustering_analysis(df, numerical_cols, notebook_cells)
+
+            # T-test Analysis
+            t_test(df, categorical_cols, numerical_cols)
+
+            # ANOVA Analysis
+            anova(df, categorical_cols, numerical_cols)
+
             # Analysis
             st.write("## Data Analysis")
             if st.button("Show Data Summary"):
                 st.write("### Summary Statistics")
                 st.write(df.describe(include='all'))
-
-            # Choose between ANOVA and T-test
-            analysis_type = st.selectbox("Select analysis type", ["ANOVA", "T-test"])
-            if analysis_type == "ANOVA":
-                anova(df, categorical_cols, numerical_cols)
-            elif analysis_type == "T-test":
-                t_test(df, categorical_cols, numerical_cols)
-
-            # Clustering Analysis
-            clustering_analysis(df, numerical_cols, notebook_cells)
 
             # Button to download notebook
             if st.button("Download Notebook"):
