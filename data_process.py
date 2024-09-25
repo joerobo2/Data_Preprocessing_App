@@ -238,7 +238,7 @@ def save_notebook(notebook):
     """Saves the Jupyter notebook to BytesIO and returns the bytes."""
     buffer = BytesIO()
     
-    # Write the notebook to the buffer without specifying format
+    # Write the notebook to the buffer as JSON string, then encode to bytes
     nbformat.write(notebook, buffer)
     
     buffer.seek(0)  # Reset the buffer position to the beginning
