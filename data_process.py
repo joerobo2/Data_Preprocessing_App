@@ -274,7 +274,7 @@ def export_notebook_cells(notebook_cells, file_path):
     nb.cells = notebook_cells
     with open(file_path, 'w') as f:
         nbformat.write(nb, f)
-
+        
 # Main function for the Streamlit app
 def main():
     # Embed the updated banner image
@@ -308,14 +308,18 @@ def main():
         # Save notebook functionality
         file_path = st.text_input("Specify file path to save the notebook (including .ipynb):", 'analysis_notebook.ipynb')
         if st.button("Save Notebook"):
+        
+            # Ensure the file path ends with '.ipynb'
             if not file_path.endswith('.ipynb'):
                 st.error("File path must end with '.ipynb'")
             else:
                 try:
                     export_notebook_cells(notebook_cells, file_path)
                     st.success(f"Notebook exported successfully to {file_path}!")
+                    print(f"Notebook saved at: {file_path}")  # For console checking
                 except Exception as e:
                     st.error(f"Error saving notebook: {e}")
+                    print(e)  # Print the error message
 
 if __name__ == "__main__":
     main()
