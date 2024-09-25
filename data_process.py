@@ -190,23 +190,87 @@ def bivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
 def multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
     st.write("**Multivariate Analysis**")
 
+    # Check if there are enough numerical columns for analysis
     if len(numerical_cols) > 1:
-        target_col = st.selectbox("Select target numerical column", numerical_cols)
-        features = st.multiselect("Select feature numerical columns", numerical_cols)
-        if features:
-            X = df[features]
-            y = df[target_col]
+        st.write("### Pairplot of numerical columns")
+        
+        # Create a pairplot
+        pairplot_fig = sns.pairplot(df[numerical_cols])
+        st.pyplot(pairplot_fig)
+        notebook_cells.append(nbformat.v4.new_code_cell("sns.pairplot(df[numerical_cols])"))
 
-            # KMeans clustering
-            kmeans = KMeans(n_clusters=3, random_state=42)
-            kmeans.fit(X)
-            df['Cluster'] = kmeans.labels_
+    # Create a subplot for the correlation heatmap
+    st.write("### Correlation Heatmap")
+    fig, ax = plt.subplots(figsize=(12, 10))  # Adjusted figure size for better visibility
+    
+    # Heatmap of correlations for numerical columns
+    correlation_matrix = df[numerical_cols].corr()
+    sns.heatmap(correlation_matrix, annot=True, fmt=".2f", cmap='coolwarm', 
+                ax=ax, square=True, cbar_kws={"shrink": .8}, 
+                annot_kws={"size": 10}, linewidths=.5)  # Added annotation size and linewidths
 
-            st.write(f"### KMeans Clustering on {target_col} with features {features}")
-            fig, ax = plt.subplots()
-            sns.scatterplot(x=df[features[0]], y=df[features[1]], hue=df['Cluster'], palette='viridis')
-            st.pyplot(fig)
-            notebook_cells.append(nbformat.v4.new_code_cell(f"sns.scatterplot(x=df['{features[0]}'], y=df['{features[1]}'], hue=df['Cluster'], palette='viridis')"))
+    ax.set_title('Correlation Heatmap', fontsize=16)  # Increased title font size
+    ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right', fontsize=12)  # Adjusted x-axis labels
+    ax.set_yticklabels(ax.get_yticklabels(), rotation=0, fontsize=12)  # Adjusted y-axis labels
+    
+    st.pyplot(fig)
+    notebook_cells.append(
+        nbformat.v4.new_code_cell("fig, ax = plt.subplots(figsize=(12, 10))\n"
+                                   "correlation_matrix = df[numerical_cols].corr()\n"
+                                   "sns.heatmap(correlation_matrix, annot=True, fmt='.2f', cmap='coolwarm', "
+                                   "ax=ax, square=True, cbar_kws={'shrink': .8}, "
+                                   "annot_kws={'size': 10}, linewidths=.5)\n"
+                                   "ax.set_title('Correlation Heatmap', fontsize=16)\n"
+                                   "ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right', fontsize=12)\n"
+                                   "ax.set_yticklabels(ax.get_yticklabels(), rotation=0, fontsize=12)"))
+
+# Function for clustering analysis with elbow method
+def clustering_analysis(df, numerical_cols, notebook_cells):
+    st.write("**Clustering Analysis**")
+
+    # Selecting the number of clusters for KMeans
+    max_k = st.slider("Select maximum number of clusters (k)", min_value=1, max_value=10, value=3)
+
+    # Elbow method to find the optimal number of clusters
+    inertia = []
+    for k in range(1, max_k + 1):
+        kmeans = KMeans(n_clusters=k, random_state=0)
+        kmeans.fit(df[numerical_cols])
+        inertia.append(kmeans.inertia_)
+
+    # Create subplots for elbow chart and cluster scatter plot
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+
+    # Elbow Chart
+    ax1.plot(range(1, max_k + 1), inertia, marker='o')
+    ax1.set_title('Elbow Method for Optimal k')
+    ax1.set_xlabel('Number of clusters (k)')
+    ax1.set_ylabel('Inertia')
+
+    # KMeans clustering and scatter plot
+    k = st.slider("Select number of clusters for KMeans", min_value=1, max_value=max_k, value=3)
+    kmeans = KMeans(n_clusters=k, random_state=0)
+    df['Cluster'] = kmeans.fit_predict(df[numerical_cols])
+
+    ax2.scatter(df[numerical_cols[0]], df[numerical_cols[1]], c=df['Cluster'], cmap='viridis', marker='o', edgecolor='k')
+    ax2.set_title(f'KMeans Clustering Results (k={k})')
+    ax2.set_xlabel(numerical_cols[0])
+    ax2.set_ylabel(numerical_cols[1])
+
+    st.pyplot(fig)
+    notebook_cells.append(nbformat.v4.new_code_cell(f"for k in range(1, {max_k + 1}):\n"
+                                                    f"    kmeans = KMeans(n_clusters=k)\n"
+                                                    f"    kmeans.fit(df[numerical_cols])\n"
+                                                    f"    inertia.append(kmeans.inertia_)\n"
+                                                    "fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))\n"
+                                                    "ax1.plot(range(1, max_k + 1), inertia, marker='o')\n"
+                                                    "ax1.set_title('Elbow Method for Optimal k')\n"
+                                                    "ax1.set_xlabel('Number of clusters (k)')\n"
+                                                    "ax1.set_ylabel('Inertia')\n"
+                                                    "ax2.scatter(df[numerical_cols[0]], df[numerical_cols[1]], c=df['Cluster'], cmap='viridis', marker='o', edgecolor='k')\n"
+                                                    "ax2.set_title(f'KMeans Clustering Results (k={k})')\n"
+                                                    "ax2.set_xlabel(numerical_cols[0])\n"
+                                                    "ax2.set_ylabel(numerical_cols[1])"))
 
 
 # Function for ANOVA test across all numerical columns
