@@ -268,20 +268,17 @@ def main():
         if st.checkbox("Perform T-tests and ANOVA"):
             statistical_analysis(df, numerical_cols, categorical_cols, notebook_cells)
 
-        # Exporting notebook
-        export_option = st.checkbox("Export analysis as notebook")
-        if export_option:
-            # Add text input for user to specify the file path
-            file_path = st.text_input("Specify file path to save the notebook (including .ipynb):", 'analysis_notebook.ipynb')
-            if st.button("Save Notebook"):
-                if not file_path.endswith('.ipynb'):
-                    st.error("File path must end with '.ipynb'")
-                else:
-                    try:
-                        export_notebook_cells(notebook_cells, file_path)
-                        st.success(f"Notebook exported successfully to {file_path}!")
-                    except Exception as e:
-                        st.error(f"Error saving notebook: {e}")
+        # Save notebook functionality
+        file_path = st.text_input("Specify file path to save the notebook (including .ipynb):", 'analysis_notebook.ipynb')
+        if st.button("Save Notebook"):
+            if not file_path.endswith('.ipynb'):
+                st.error("File path must end with '.ipynb'")
+            else:
+                try:
+                    export_notebook_cells(notebook_cells, file_path)
+                    st.success(f"Notebook exported successfully to {file_path}!")
+                except Exception as e:
+                    st.error(f"Error saving notebook: {e}")
 
 if __name__ == "__main__":
     main()
