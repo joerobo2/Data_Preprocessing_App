@@ -5,7 +5,10 @@ import scipy.stats as stats
 import time
 import numpy as np
 import streamlit as st
+from io import StringIO
+from scipy.stats.mstats import winsorize
 import pandas as pd
+import os
 import nbformat
 
 # Function to import CSV from BytesIO object.
@@ -31,6 +34,8 @@ def preprocess_data(df, notebook_cells, columns_to_drop):
     try:
         df.dropna(how='all', inplace=True)
         removed_rows_all = initial_rows - len(df)
+        if removed_rows_all > 0:
+            st.success(f"Removed {removed_rows_all} rows with all missing values.")
     except Exception as e:
         st.error(f"Error removing rows with all missing values: {e}")
 
@@ -39,6 +44,8 @@ def preprocess_data(df, notebook_cells, columns_to_drop):
         initial_rows_after_all = len(df)
         df.dropna(inplace=True)
         removed_rows_na = initial_rows_after_all - len(df)
+        if removed_rows_na > 0:
+            st.success(f"Removed {removed_rows_na} rows with missing values.")
     except Exception as e:
         st.error(f"Error removing rows with missing values: {e}")
 
@@ -63,107 +70,22 @@ def preprocess_data(df, notebook_cells, columns_to_drop):
         initial_rows = len(df)
         df.drop_duplicates(inplace=True)
         removed_duplicates = initial_rows - len(df)
+        if removed_duplicates > 0:
+            st.success(f"Removed {removed_duplicates} duplicate rows.")
     except Exception as e:
         st.error(f"Error removing duplicate rows: {e}")
         removed_duplicates = 0
 
-    return df, categorical_cols, numerical_cols
+    # Convert object columns with few unique values to categorical
+    try:
+        for col in categorical_cols:
+            if df[col].nunique() / len(df) < 0.5:  # Change threshold as needed
+                df[col] = df[col].astype('category')
+        st.success("Converted object columns to categorical types where applicable.")
+    except Exception as e:
+        st.error(f"Error converting columns to category type: {e}")
 
-# Function for univariate analysis
-def univariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
-    st.write("**Univariate Analysis**")
-    if numerical_cols:
-        num_col = st.selectbox("Select numerical column for Univariate Analysis", numerical_cols)
-        fig, ax = plt.subplots()
-        sns.histplot(df[num_col], kde=True, ax=ax)
-        ax.set_title(f'Histogram of {num_col}')
-        st.pyplot(fig)
-        notebook_cells.append(nbformat.v4.new_code_cell(f"sns.histplot(df['{num_col}'], kde=True)\nplt.title('Histogram of {num_col}')\nplt.show()"))
-
-    if categorical_cols:
-        cat_col = st.selectbox("Select categorical column for Univariate Analysis", categorical_cols)
-        fig, ax = plt.subplots()
-        sns.countplot(x=cat_col, data=df, ax=ax)
-        ax.set_title(f'Count Plot of {cat_col}')
-        st.pyplot(fig)
-        notebook_cells.append(nbformat.v4.new_code_cell(f"sns.countplot(x='{cat_col}', data=df)\nplt.title('Count Plot of {cat_col}')\nplt.show()"))
-
-# Function for bivariate analysis
-def bivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
-    st.write("**Bivariate Analysis**")
-    if numerical_cols and categorical_cols:
-        num_col = st.selectbox("Select numerical column for Bivariate Analysis", numerical_cols)
-        cat_col = st.selectbox("Select categorical column for Bivariate Analysis", categorical_cols)
-
-        fig, ax = plt.subplots()
-        sns.boxplot(x=cat_col, y=num_col, data=df, ax=ax)
-        ax.set_title(f'Box Plot of {num_col} by {cat_col}')
-        st.pyplot(fig)
-        notebook_cells.append(nbformat.v4.new_code_cell(f"sns.boxplot(x='{cat_col}', y='{num_col}', data=df)\nplt.title('Box Plot of {num_col} by {cat_col}')\nplt.show()"))
-
-# Function for multivariate analysis
-def multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
-    st.write("**Multivariate Analysis**")
-    if len(numerical_cols) >= 2:
-        num_cols = st.multiselect("Select numerical columns for Multivariate Analysis", numerical_cols)
-        if len(num_cols) == 2:
-            fig, ax = plt.subplots()
-            sns.scatterplot(x=num_cols[0], y=num_cols[1], data=df, hue=df[categorical_cols[0]])
-            ax.set_title(f'Scatter Plot of {num_cols[0]} vs {num_cols[1]}')
-            st.pyplot(fig)
-            notebook_cells.append(nbformat.v4.new_code_cell(f"sns.scatterplot(x='{num_cols[0]}', y='{num_cols[1]}', data=df, hue=df['{categorical_cols[0]}'])\nplt.title('Scatter Plot of {num_cols[0]} vs {num_cols[1]}')\nplt.show()"))
-
-# Function for clustering analysis with elbow method
-def clustering_analysis(df, numerical_cols, notebook_cells):
-    st.write("**Clustering Analysis**")
-
-    # Selecting the number of clusters for KMeans
-    max_k = st.slider("Select maximum number of clusters (k)", min_value=1, max_value=10, value=3)
-
-    # Elbow method to find the optimal number of clusters
-    inertia = []
-    for k in range(1, max_k + 1):
-        kmeans = KMeans(n_clusters=k, random_state=0)
-        kmeans.fit(df[numerical_cols])
-        inertia.append(kmeans.inertia_)
-
-    # Create subplots for elbow chart and cluster scatter plot
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
-
-    # Elbow Chart
-    ax1.plot(range(1, max_k + 1), inertia, marker='o')
-    ax1.set_title('Elbow Method for Optimal k')
-    ax1.set_xlabel('Number of clusters (k)')
-    ax1.set_ylabel('Inertia')
-
-    # KMeans clustering and scatter plot
-    k = st.slider("Select number of clusters for KMeans", min_value=1, max_value=max_k, value=3)
-    kmeans = KMeans(n_clusters=k, random_state=0)
-    df['Cluster'] = kmeans.fit_predict(df[numerical_cols])
-
-    ax2.scatter(df[numerical_cols[0]], df[numerical_cols[1]], c=df['Cluster'], cmap='viridis', marker='o')
-    ax2.set_title(f'KMeans Clustering Results (k={k})')
-    ax2.set_xlabel(numerical_cols[0])
-    ax2.set_ylabel(numerical_cols[1])
-
-    st.pyplot(fig)
-
-    # Append notebook cell for clustering analysis
-    notebook_cells.append(nbformat.v4.new_code_cell(
-        f"for k in range(1, {max_k + 1}):\n"
-        f"    kmeans = KMeans(n_clusters=k)\n"
-        f"    kmeans.fit(df[numerical_cols])\n"
-        f"    inertia.append(kmeans.inertia_)\n"
-        "fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))\n"
-        "ax1.plot(range(1, max_k + 1), inertia, marker='o')\n"
-        "ax1.set_title('Elbow Method for Optimal k')\n"
-        "ax1.set_xlabel('Number of clusters (k)')\n"
-        "ax1.set_ylabel('Inertia')\n"
-        "ax2.scatter(df[numerical_cols[0]], df[numerical_cols[1]], c=df['Cluster'], cmap='viridis', marker='o')\n"
-        "ax2.set_title(f'KMeans Clustering Results (k={k})')\n"
-        "ax2.set_xlabel(numerical_cols[0])\n"
-        "ax2.set_ylabel(numerical_cols[1])"
-    ))
+    return df, categorical_cols.tolist(), numerical_cols.tolist()
 
 # Function for ANOVA across all numerical columns
 def anova(df, categorical_cols, numerical_cols):
@@ -180,7 +102,7 @@ def anova(df, categorical_cols, numerical_cols):
             "Significance": []
         }
 
-        # Add a Run button to execute ANOVA
+        # Add a Run button to execute the ANOVA
         if st.button("Run ANOVA"):
             # Ensure the categorical column has more than two groups for ANOVA
             if df[cat_col].nunique() > 1:
@@ -238,63 +160,100 @@ def t_test(df, categorical_cols, numerical_cols):
             else:
                 st.warning("T-test requires exactly two groups in the selected categorical column.")
 
-# Streamlit App
+# Function for clustering analysis with elbow method
+def clustering_analysis(df, numerical_cols, notebook_cells):
+    st.write("**Clustering Analysis**")
+
+    # Selecting the number of clusters for KMeans
+    max_k = st.slider("Select maximum number of clusters (k)", min_value=1, max_value=10, value=3)
+
+    # Elbow method to find the optimal number of clusters
+    inertia = []
+    for k in range(1, max_k + 1):
+        kmeans = KMeans(n_clusters=k, random_state=0)
+        kmeans.fit(df[numerical_cols])
+        inertia.append(kmeans.inertia_)
+
+    # Create subplots for elbow chart and cluster scatter plot
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+
+    # Elbow Chart
+    ax1.plot(range(1, max_k + 1), inertia, marker='o')
+    ax1.set_title('Elbow Method for Optimal k')
+    ax1.set_xlabel('Number of clusters (k)')
+    ax1.set_ylabel('Inertia')
+
+    # KMeans clustering and scatter plot
+    k = st.slider("Select number of clusters for KMeans", min_value=1, max_value=max_k, value=3)
+    kmeans = KMeans(n_clusters=k, random_state=0)
+    df['Cluster'] = kmeans.fit_predict(df[numerical_cols])
+
+    ax2.scatter(df[numerical_cols[0]], df[numerical_cols[1]], c=df['Cluster'], cmap='viridis', marker='o', edgecolor='k')
+    ax2.set_title(f'KMeans Clustering Results (k={k})')
+    ax2.set_xlabel(numerical_cols[0])
+    ax2.set_ylabel(numerical_cols[1])
+
+    st.pyplot(fig)
+
+    # Append notebook cell for clustering analysis
+    notebook_cells.append(nbformat.v4.new_code_cell(
+        f"for k in range(1, {max_k + 1}):\n"
+        f"    kmeans = KMeans(n_clusters=k)\n"
+        f"    kmeans.fit(df[numerical_cols])\n"
+        f"    inertia.append(kmeans.inertia_)\n"
+        "fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))\n"
+        "ax1.plot(range(1, max_k + 1), inertia, marker='o')\n"
+        f"ax1.set_title('Elbow Method for Optimal k')\n"
+        f"ax1.set_xlabel('Number of clusters (k)')\n"
+        f"ax1.set_ylabel('Inertia')\n"
+        f"ax2.scatter(df[numerical_cols[0]], df[numerical_cols[1]], c=df['Cluster'], cmap='viridis')\n"
+        f"ax2.set_title(f'KMeans Clustering Results (k={k})')\n"
+        f"ax2.set_xlabel(numerical_cols[0])\n"
+        f"ax2.set_ylabel(numerical_cols[1])"
+    ))
+
 def main():
-    # Embed the updated banner image
-    banner_path = "EDA App Banner.png"  # Update to the correct path
-    st.image(banner_path, use_column_width=True)
-    
-    # Title
     st.title("Exploratory Data Analysis App")
 
-    # Select CSV file
-    uploaded_file = st.file_uploader("Choose a CSV file", type='csv')
+    uploaded_file = st.file_uploader("Upload your CSV file", type=["csv"])
     if uploaded_file is not None:
-        df = pd.read_csv(uploaded_file)
-        st.write("Data Preview")
-        st.write(df.head())
-
-        # Initialize notebook cells
+        # Import notebook cells
         notebook_cells = []
 
-        # Preprocess Data
-        df, categorical_cols, numerical_cols = preprocess_data(df, notebook_cells, columns_to_drop=[])
+        df = import_notebook(uploaded_file)
+        if df is not None:
+            st.write("### Data Preview")
+            st.dataframe(df.head())
 
-        # Univariate Analysis Button
-        if st.button("Run Univariate Analysis"):
-            univariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
+            # Preprocessing
+            st.write("## Data Preprocessing")
+            columns_to_drop = st.multiselect("Select columns to drop", df.columns.tolist())
+            df, categorical_cols, numerical_cols = preprocess_data(df, notebook_cells, columns_to_drop)
 
-        # Bivariate Analysis Button
-        if st.button("Run Bivariate Analysis"):
-            bivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
+            # Analysis
+            st.write("## Data Analysis")
+            if st.button("Show Data Summary"):
+                st.write("### Summary Statistics")
+                st.write(df.describe(include='all'))
 
-        # Multivariate Analysis Button
-        if st.button("Run Multivariate Analysis"):
-            multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
+            # Choose between ANOVA and T-test
+            analysis_type = st.selectbox("Select analysis type", ["ANOVA", "T-test"])
+            if analysis_type == "ANOVA":
+                anova(df, categorical_cols, numerical_cols)
+            elif analysis_type == "T-test":
+                t_test(df, categorical_cols, numerical_cols)
 
-        # KMeans Clustering Button
-        if st.button("Run Clustering Analysis"):
+            # Clustering Analysis
             clustering_analysis(df, numerical_cols, notebook_cells)
 
-        # Statistical Tests
-        anova(df, categorical_cols, numerical_cols)
-        t_test(df, categorical_cols, numerical_cols)
-
-        # Input fields for file paths
-        notebook_path = st.text_input("Path to save the notebook (.ipynb)", "EDA_Notebook.ipynb")
-        csv_path = st.text_input("Path to save the transformed CSV file", "Transformed_Data.csv")
-
-        # Save notebook cells to a .ipynb file
-        if st.button("Save Notebook and Transformed Data"):
-            # Save the notebook
-            with open(notebook_path, "w") as f:
-                nb = nbformat.v4.new_notebook()
-                nb.cells = notebook_cells
-                nbformat.write(nb, f)
-
-            # Save the transformed data
-            df.to_csv(csv_path, index=False)
-            st.success(f"Notebook saved as {notebook_path} and transformed data saved as {csv_path}")
+            # Button to download notebook
+            if st.button("Download Notebook"):
+                notebook_filename = "EDA_notebook.ipynb"
+                with open(notebook_filename, "w") as f:
+                    nb = nbformat.v4.new_notebook(cells=notebook_cells)
+                    nbformat.write(nb, f)
+                with open(notebook_filename, "rb") as f:
+                    st.download_button("Download EDA Notebook", f, file_name=notebook_filename)
 
 if __name__ == "__main__":
     main()
