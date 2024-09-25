@@ -228,21 +228,21 @@ kmeans.fit(df[{', '.join(repr(col) for col in numerical_cols)}])
 df['Cluster'] = kmeans.labels_
 """))
 
-    
 def create_notebook(notebook_cells):
     """Creates a Jupyter Notebook from cells."""
-    nb = nbformat.v4.new_notebook()
-    nb.cells = notebook_cells
+    nb = nbformat.v4.new_notebook()  # Create a new notebook
+    nb.cells = notebook_cells  # Add cells to the notebook
     return nb
-
 
 def save_notebook(notebook):
     """Saves the Jupyter notebook to BytesIO and returns the bytes."""
     buffer = BytesIO()
-    nbformat.write(notebook, buffer, format='ipynb')  # Ensure format is specified
-    buffer.seek(0)
-    return buffer.getvalue()
-
+    
+    # Since the notebook is created using nbformat, it is already a valid notebook object
+    nbformat.write(notebook, buffer)
+    
+    buffer.seek(0)  # Reset the buffer position to the beginning
+    return buffer.getvalue()  # Return the byte content of the buffer
 
 def main():
     st.title("Data Preprocessing and Analysis App")
