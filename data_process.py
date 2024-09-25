@@ -102,8 +102,8 @@ def anova(df, categorical_cols, numerical_cols):
             "Significance": []
         }
 
-        # Add a Run button to execute the ANOVA
-        if st.button("Run ANOVA"):
+        # Checkbox to execute the ANOVA
+        if st.checkbox("Run ANOVA"):
             # Ensure the categorical column has more than two groups for ANOVA
             if df[cat_col].nunique() > 1:
                 groups = [df[df[cat_col] == group][numerical_cols].dropna() for group in df[cat_col].unique()]
@@ -138,8 +138,8 @@ def t_test(df, categorical_cols, numerical_cols):
             "Significance": []
         }
 
-        # Add a Run button to execute the T-test
-        if st.button("Run T-test"):
+        # Checkbox to execute the T-test
+        if st.checkbox("Run T-test"):
             # Ensure the categorical column has exactly two groups for T-test
             if df[cat_col].nunique() == 2:
                 for num_col in numerical_cols:
@@ -167,7 +167,8 @@ def univariate_analysis(df, numerical_cols, notebook_cells):
     if len(numerical_cols) > 0:
         selected_col = st.selectbox("Select numerical column for Univariate Analysis", numerical_cols)
         
-        if st.button("Run Univariate Analysis"):
+        # Checkbox to execute the univariate analysis
+        if st.checkbox("Run Univariate Analysis"):
             fig, ax = plt.subplots()
             sns.histplot(df[selected_col], kde=True, ax=ax)
             ax.set_title(f'Univariate Analysis of {selected_col}')
@@ -188,7 +189,8 @@ def bivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
         selected_cat = st.selectbox("Select categorical column for Bivariate Analysis", categorical_cols)
         selected_num = st.selectbox("Select numerical column for Bivariate Analysis", numerical_cols)
         
-        if st.button("Run Bivariate Analysis"):
+        # Checkbox to execute the bivariate analysis
+        if st.checkbox("Run Bivariate Analysis"):
             fig, ax = plt.subplots()
             sns.boxplot(x=df[selected_cat], y=df[selected_num], ax=ax)
             ax.set_title(f'Bivariate Analysis of {selected_num} by {selected_cat}')
@@ -208,7 +210,8 @@ def multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
     if len(categorical_cols) > 0 and len(numerical_cols) > 0:
         selected_cat = st.selectbox("Select categorical column for Multivariate Analysis", categorical_cols)
         
-        if st.button("Run Multivariate Analysis"):
+        # Checkbox to execute the multivariate analysis
+        if st.checkbox("Run Multivariate Analysis"):
             fig, ax = plt.subplots(figsize=(12, 6))
             sns.violinplot(x=df[selected_cat], y=df[numerical_cols[0]], data=df, ax=ax)
             ax.set_title(f'Multivariate Analysis of {numerical_cols[0]} by {selected_cat}')
@@ -228,7 +231,8 @@ def clustering_analysis(df, numerical_cols, notebook_cells):
     if len(numerical_cols) > 0:
         k = st.slider("Select number of clusters (k)", min_value=1, max_value=10, value=3)
         
-        if st.button("Run Clustering Analysis"):
+        # Checkbox to execute the clustering analysis
+        if st.checkbox("Run Clustering Analysis"):
             kmeans = KMeans(n_clusters=k, random_state=42)
             df['Cluster'] = kmeans.fit_predict(df[numerical_cols])
             inertia = kmeans.inertia_
