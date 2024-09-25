@@ -268,22 +268,27 @@ def statistical_analysis(df, numerical_cols, categorical_cols, notebook_cells):
     notebook_cells.append(nbformat.v4.new_code_cell("import pandas as pd\n" + anova_df.to_string(index=False)))
 
 # Exporting the Notebook Function
-def export_notebook_cells(notebook_cells, file_path):
-    """Export notebook cells to a .ipynb file."""
+def export_notebook_cells(notebook_cells):
+    """Export notebook cells to a .ipynb file in memory."""
     nb = nbformat.v4.new_notebook()
     nb.cells = notebook_cells
-    with open(file_path, 'w') as f:
-        nbformat.write(nb, f)
+    
+    # Use BytesIO to hold the notebook data in memory
+    with io.BytesIO() as buf:
+        nbformat.write(nb, buf)
+        buf.seek(0)  # Go to the start of the BytesIO buffer
+        return buf.getvalue()  # Return the bytes of the notebook
         
 # Main function for the Streamlit app
 def main():
     # Embed the updated banner image
     banner_path = "EDA App Banner.png"  # Update to the correct path
     st.image(banner_path, use_column_width=True)
-
+    
+    # Title
     st.title("Data Preprocessing and Analysis App")
+    
     uploaded_file = st.file_uploader("Upload CSV File", type=["csv"])
-
     if uploaded_file is not None:
         notebook_cells = []
 
@@ -305,21 +310,21 @@ def main():
         if st.checkbox("Perform T-tests and ANOVA"):
             statistical_analysis(df, numerical_cols, categorical_cols, notebook_cells)
 
-        # Save notebook functionality
-        file_path = st.text_input("Specify file path to save the notebook (including .ipynb):", 'analysis_notebook.ipynb')
-        if st.button("Save Notebook"):
-        
-            # Ensure the file path ends with '.ipynb'
-            if not file_path.endswith('.ipynb'):
-                st.error("File path must end with '.ipynb'")
-            else:
-                try:
-                    export_notebook_cells(notebook_cells, file_path)
-                    st.success(f"Notebook exported successfully to {file_path}!")
-                    print(f"Notebook saved at: {file_path}")  # For console checking
-                except Exception as e:
-                    st.error(f"Error saving notebook: {e}")
-                    print(e)  # Print the error message
+       # Replace the save notebook functionality with download
+        if st.button("Export Notebook"):
+            try:
+                notebook_bytes = export_notebook_cells(notebook_cells)
+                # Create a download button
+                st.download_button(
+                    label="Download Notebook",
+                    data=notebook_bytes,
+                    file_name="analysis_notebook.ipynb",
+                    mime="application/ipynb"  # Specify the MIME type for Jupyter notebooks
+                )
+                st.success("Notebook ready for download!")
+            except Exception as e:
+                st.error(f"Error preparing notebook for download: {e}")
+                print(e)  # Print the error message
 
 if __name__ == "__main__":
     main()
