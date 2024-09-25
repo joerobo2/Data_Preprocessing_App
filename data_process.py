@@ -304,7 +304,7 @@ def save_results(dataframe, file_path):
 
 def main():
     # Embed the updated banner image
-    banner_path = "EDA_App_Banner.png"  # Update to the correct path
+    banner_path = "EDA App Banner.png"  # Update to the correct path
     st.image(banner_path, use_column_width=True)
 
     # Update the title to "EDA App"
