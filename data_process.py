@@ -27,17 +27,20 @@ def preprocess_data(df, notebook_cells, columns_to_drop):
     initial_rows = len(df)
     removed_rows_all = removed_rows_na = 0
 
+    # Drop specified columns
     if columns_to_drop:
         df.drop(columns=columns_to_drop, axis=1, inplace=True)
         st.success(f"Dropped columns: {', '.join(columns_to_drop)}")
         notebook_cells.append(nbformat.v4.new_markdown_cell(f"## Dropped Columns: {', '.join(columns_to_drop)}"))
 
+    # Remove rows where all values are missing
     try:
         df.dropna(how='all', inplace=True)
         removed_rows_all = initial_rows - len(df)
     except Exception as e:
         st.error(f"Error removing rows with all missing values: {e}")
 
+    # Remove rows with any missing values and handle errors
     try:
         df.replace('', np.nan, inplace=True)
         initial_rows_after_all = len(df)
@@ -46,6 +49,7 @@ def preprocess_data(df, notebook_cells, columns_to_drop):
     except Exception as e:
         st.error(f"Error removing rows with missing values: {e}")
 
+    # Impute missing numerical values
     try:
         numerical_cols = df.select_dtypes(include=['int64', 'float64']).columns
         df[numerical_cols] = df[numerical_cols].fillna(df[numerical_cols].mean())
@@ -54,16 +58,19 @@ def preprocess_data(df, notebook_cells, columns_to_drop):
         st.error(f"Error imputing missing numerical values: {e}")
         imputed_numerical = 0
 
+    # Impute missing categorical values
     try:
         categorical_cols = df.select_dtypes(include=['object']).columns
         for col in categorical_cols:
             if col in df.columns:  # Ensure column exists before filling
-                df[col] = df[col].fillna(df[col].mode()[0])
+                mode_value = df[col].mode()[0] if not df[col].isnull().all() else np.nan
+                df[col] = df[col].fillna(mode_value)
         imputed_categorical = df[categorical_cols].isnull().sum().sum()
     except Exception as e:
         st.error(f"Error imputing missing categorical values: {e}")
         imputed_categorical = 0
 
+    # Remove duplicate rows
     try:
         initial_rows = len(df)
         df.drop_duplicates(inplace=True)
@@ -94,54 +101,26 @@ def preprocess_data(df, notebook_cells, columns_to_drop):
     preprocess_time = time.time() - start_time
     st.write(f"Preprocessing took {preprocess_time:.2f} seconds")
 
+    # Log notebook cells
     notebook_cells.append(nbformat.v4.new_markdown_cell("## Preprocessing Summary"))
-    notebook_cells.append(nbformat.v4.new_code_cell(
-        "initial_rows = len(df)\n"
-        "df.dropna(how='all', inplace=True)\n"
-        "df.replace('', np.nan, inplace=True)\n"
-        "df.dropna(inplace=True)\n"
-        "removed_rows_all = initial_rows - len(df)\n\n"
-        "numerical_cols = df.select_dtypes(include=['int64', 'float64']).columns\n"
-        "df[numerical_cols] = df[numerical_cols].fillna(df[numerical_cols].mean())\n"
-        "imputed_numerical = df[numerical_cols].isnull().sum().sum()\n\n"
-        "categorical_cols = df.select_dtypes(include=['object']).columns\n"
-        "for col in categorical_cols:\n"
-        "    if col in df.columns:\n"
-        "        df[col] = df[col].fillna(df[col].mode()[0])\n"
-        "imputed_categorical = df[categorical_cols].isnull().sum().sum()\n\n"
-        "initial_rows = len(df)\n"
-        "df.drop_duplicates(inplace=True)\n"
-        "removed_duplicates = initial_rows - len(df)\n\n"
-        "for col in categorical_cols:\n"
-        "    if col in df.columns and df[col].nunique() / len(df) < 0.5:\n"
-        "        df[col] = df[col].astype('category')\n\n"
-        "from scipy.stats.mstats import winsorize\n"
-        "for col in numerical_cols:\n"
-        "    if col in df.columns:\n"
-        "        df[col] = winsorize(df[col], limits=[0.05, 0.05])"
-    ))
+    notebook_cells.append(nbformat.v4.new_code_cell("Your code for summarization here."))  # Adjust this part as necessary
 
-    notebook_cells.append(nbformat.v4.new_markdown_cell(f"- Removed {removed_rows_all} rows with all missing values."))
-    notebook_cells.append(nbformat.v4.new_markdown_cell(f"- Removed {removed_rows_na} rows with missing values."))
-    imputation_summary = [
-        f"- Imputed {imputed_numerical} missing numerical values." if imputed_numerical > 0 else "- No missing numerical values imputed.",
-        f"- Imputed {imputed_categorical} missing categorical values." if imputed_categorical > 0 else "- No missing categorical values imputed.",
-        f"- Removed {removed_duplicates} duplicate rows." if removed_duplicates > 0 else "- No duplicate rows removed.",
-        f"- Winsorized: {len(winsorized_rows)} rows, {len(numerical_cols)} cols using limits {winsorize_limits}."
-    ]
-    for summary in imputation_summary:
-        st.markdown(summary)
+    # Summary of preprocessing steps
+    st.markdown(f"- Removed {removed_rows_all} rows with all missing values.")
+    st.markdown(f"- Removed {removed_rows_na} rows with missing values.")
+    st.markdown(f"- Imputed {imputed_numerical} missing numerical values." if imputed_numerical > 0 else "- No missing numerical values imputed.")
+    st.markdown(f"- Imputed {imputed_categorical} missing categorical values." if imputed_categorical > 0 else "- No missing categorical values imputed.")
+    st.markdown(f"- Removed {removed_duplicates} duplicate rows." if removed_duplicates > 0 else "- No duplicate rows removed.")
+    st.markdown(f"- Winsorized: {len(winsorized_rows)} rows, {len(numerical_cols)} cols using limits {winsorize_limits}.")
 
+    # Display DataFrame info
     st.write("**Data Information**")
     buffer = StringIO()
     df.info(buf=buffer)
     s = buffer.getvalue()
     st.text(s)
-    notebook_cells.append(nbformat.v4.new_markdown_cell("## Data Information"))
-    notebook_cells.append(nbformat.v4.new_code_cell("df.info()"))
 
     return df, categorical_cols, numerical_cols
-
 
 def univariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
     st.header("Univariate Analysis")
