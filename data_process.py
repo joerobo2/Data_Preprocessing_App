@@ -1,14 +1,12 @@
-import seaborn as sns
-import matplotlib.pyplot as plt
-from sklearn.cluster import KMeans
-import scipy.stats as stats
-import time
+import pandas as pd
 import numpy as np
 import streamlit as st
-import io
+import time
+import plotly.express as px
+import plotly.graph_objects as go
+from sklearn.cluster import KMeans
+from scipy import stats
 from io import StringIO
-from scipy.stats.mstats import winsorize
-import pandas as pd
 import nbformat
 
 # Function to import CSV from BytesIO object.
@@ -82,7 +80,7 @@ def preprocess_data(df, notebook_cells, columns_to_drop):
     try:
         for col in numerical_cols:
             original_data = df[col].copy()
-            df[col] = winsorize(df[col], limits=winsorize_limits)
+            df[col] = stats.mstats.winsorize(df[col], limits=winsorize_limits)
             winsorized_diff = (original_data != df[col]).sum()
             if winsorized_diff > 0:
                 winsorized_rows.append(winsorized_diff)
@@ -139,48 +137,52 @@ def preprocess_data(df, notebook_cells, columns_to_drop):
     return df, categorical_cols, numerical_cols
 
 
-# Function for univariate analysis
+# Function for univariate analysis using Plotly
 def univariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
     st.write("**Univariate Analysis**")
 
     # Plot for numerical columns
     for col in numerical_cols:
         st.write(f"### Distribution of {col}")
-        fig, ax = plt.subplots()
-        sns.histplot(df[col], kde=True, ax=ax)
-        st.pyplot(fig)
-        notebook_cells.append(nbformat.v4.new_code_cell(f"sns.histplot(df['{col}'], kde=True)"))
+        fig = px.histogram(df, x=col, nbins=30, title=f'Distribution of {col}', marginal='box')
+        st.plotly_chart(fig)
+        notebook_cells.append(nbformat.v4.new_code_cell(f"px.histogram(df, x='{col}', nbins=30)"))
 
     # Plot for categorical columns
     for col in categorical_cols:
         st.write(f"### Count plot of {col}")
-        fig, ax = plt.subplots()
-        sns.countplot(x=df[col], ax=ax)
-        st.pyplot(fig)
-        notebook_cells.append(nbformat.v4.new_code_cell(f"sns.countplot(x=df['{col}'])"))
+        fig = px.histogram(df, x=col, title=f'Count plot of {col}', color_discrete_sequence=px.colors.qualitative.Set2)
+        st.plotly_chart(fig)
+        notebook_cells.append(nbformat.v4.new_code_cell(f"px.histogram(df, x='{col}')"))
 
 
-# Function for multivariate analysis
+# Function for multivariate analysis using Plotly
 def multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
     st.write("**Multivariate Analysis**")
 
     # Pairplot for numerical columns
     if len(numerical_cols) > 1:
         st.write("### Pairplot of numerical columns")
-        fig = sns.pairplot(df[numerical_cols])
-        st.pyplot(fig)
-        notebook_cells.append(nbformat.v4.new_code_cell("sns.pairplot(df[numerical_cols])"))
+        fig = px.scatter_matrix(df[numerical_cols], title='Scatter Matrix of Numerical Columns')
+        st.plotly_chart(fig)
+        notebook_cells.append(nbformat.v4.new_code_cell("px.scatter_matrix(df[numerical_cols])"))
 
-    # Heatmap of correlations for numerical columns
-    st.write("### Correlation heatmap")
+    # Correlation heatmap using Plotly
+    st.write("### Correlation Heatmap")
     correlation_matrix = df[numerical_cols].corr()
-    fig, ax = plt.subplots()
-    sns.heatmap(correlation_matrix, annot=True, fmt=".2f", cmap='coolwarm', ax=ax)
-    st.pyplot(fig)
-    notebook_cells.append(nbformat.v4.new_code_cell("sns.heatmap(correlation_matrix, annot=True, fmt='.2f', cmap='coolwarm')"))
+    fig = go.Figure(data=go.Heatmap(
+        z=correlation_matrix.values,
+        x=correlation_matrix.columns,
+        y=correlation_matrix.index,
+        colorscale='Viridis',
+        colorbar=dict(title='Correlation'),
+        zmin=-1,
+        zmax=1
+    ))
+    fig.update_layout(title='Correlation Heatmap', xaxis_title='Variables', yaxis_title='Variables')
+    st.plotly_chart(fig)
+    notebook_cells.append(nbformat.v4.new_code_cell("go.Figure(data=go.Heatmap(...))"))
 
-    # Clustering
-    clustering_analysis(df, numerical_cols, notebook_cells)
 
 def clustering_analysis(df, numerical_cols, notebook_cells):
     st.write("### Clustering Analysis")
@@ -190,14 +192,15 @@ def clustering_analysis(df, numerical_cols, notebook_cells):
     kmeans = KMeans(n_clusters=num_clusters, random_state=42)
     df['Cluster'] = kmeans.fit_predict(df[numerical_cols])
 
-    # Visualizing the clusters
+    # Visualizing the clusters using Plotly
     st.write(f"#### KMeans Clustering with {num_clusters} Clusters")
-    fig, ax = plt.subplots()
-    sns.scatterplot(data=df, x=numerical_cols[0], y=numerical_cols[1], hue='Cluster', palette='viridis', ax=ax)
-    st.pyplot(fig)
+    fig = px.scatter(df, x=numerical_cols[0], y=numerical_cols[1], color='Cluster',
+                     title=f'KMeans Clustering with {num_clusters} Clusters', 
+                     color_continuous_scale=px.colors.sequential.Viridis)
+    st.plotly_chart(fig)
     notebook_cells.append(nbformat.v4.new_code_cell(f"kmeans = KMeans(n_clusters={num_clusters}, random_state=42)\n"
                                                     f"df['Cluster'] = kmeans.fit_predict(df[numerical_cols])\n"
-                                                    f"sns.scatterplot(data=df, x='{numerical_cols[0]}', y='{numerical_cols[1]}', hue='Cluster', palette='viridis')"))
+                                                    f"px.scatter(df, x='{numerical_cols[0]}', y='{numerical_cols[1]}', color='Cluster')"))
 
 
 # Function for statistical analysis
@@ -238,11 +241,6 @@ def statistical_analysis(df, numerical_cols, notebook_cells):
     st.write("#### Correlation Coefficients")
     st.table(correlation_matrix)
 
-    # Optional: Display a heatmap of correlations
-    fig, ax = plt.subplots()
-    sns.heatmap(correlation_matrix, annot=True, fmt=".2f", cmap='coolwarm', ax=ax)
-    st.pyplot(fig)
-    notebook_cells.append(nbformat.v4.new_code_cell("sns.heatmap(correlation_matrix, annot=True, fmt='.2f', cmap='coolwarm')"))
 
 # Main function to run the Streamlit app
 def main():
@@ -280,6 +278,10 @@ def main():
             # Multivariate analysis
             if st.checkbox("Multivariate Analysis"):
                 multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
+
+            # Clustering analysis
+            if st.checkbox("Clustering Analysis"):
+                clustering_analysis(df, numerical_cols, notebook_cells)
 
             # Statistical analysis
             if st.checkbox("Statistical Analysis"):
