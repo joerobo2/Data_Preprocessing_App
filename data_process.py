@@ -209,23 +209,34 @@ def multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
             notebook_cells.append(nbformat.v4.new_code_cell(f"sns.scatterplot(x=df['{features[0]}'], y=df['{features[1]}'], hue=df['Cluster'], palette='viridis')"))
 
 
-# Function for ANOVA test
+# Function for ANOVA test across all numerical columns
 def anova_test(df, categorical_cols, numerical_cols):
-    st.write("**ANOVA Test**")
+    st.write("**ANOVA Test Summary**")
 
     if len(categorical_cols) > 0 and len(numerical_cols) > 0:
         cat_col = st.selectbox("Select categorical column for ANOVA", categorical_cols)
-        num_col = st.selectbox("Select numerical column for ANOVA", numerical_cols)
+        
+        # Initialize a summary table
+        summary_data = {
+            "Numerical Column": [],
+            "F-statistic": [],
+            "p-value": [],
+            "Significance": []
+        }
 
-        if st.button("Run ANOVA"):
+        for num_col in numerical_cols:
             groups = [group[num_col].values for name, group in df.groupby(cat_col)]
             f_stat, p_val = stats.f_oneway(*groups)
+            
+            summary_data["Numerical Column"].append(num_col)
+            summary_data["F-statistic"].append(f_stat)
+            summary_data["p-value"].append(p_val)
+            summary_data["Significance"].append("Reject H0" if p_val < 0.05 else "Fail to Reject H0")
 
-            st.write(f"F-statistic: {f_stat:.4f}, p-value: {p_val:.4f}")
-            if p_val < 0.05:
-                st.success("Reject the null hypothesis: at least one group mean is different.")
-            else:
-                st.warning("Fail to reject the null hypothesis: no significant difference in means.")
+        # Create a DataFrame from the summary data
+        summary_df = pd.DataFrame(summary_data)
+
+        st.write(summary_df)
 
 
 # Function for T-tests
