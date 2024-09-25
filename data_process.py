@@ -8,13 +8,16 @@ import streamlit as st
 from io import StringIO
 from scipy.stats.mstats import winsorize
 import pandas as pd
-import os
 import nbformat
 
-def import_notebook(filepath):
-    if not os.path.exists(filepath):
-        raise FileNotFoundError(f"File not found: {filepath}")
-    return pd.read_csv(filepath)
+# Function to import CSV from BytesIO object.
+def import_notebook(uploaded_file):
+    """Read a CSV file from the uploaded file."""
+    try:
+        df = pd.read_csv(uploaded_file)  # Read directly from the uploaded file
+    except Exception as e:
+        raise ValueError(f"Error reading the CSV file: {e}")
+    return df
 
 def preprocess_data(df, notebook_cells, columns_to_drop):
     start_time = time.time()
@@ -233,7 +236,7 @@ def main():
         # Add dataset reading cell
         notebook_cells.append(nbformat.v4.new_code_cell("df = pd.read_csv('uploaded_file.csv')"))
         
-        df = import_notebook(uploaded_file)
+        df = import_notebook(uploaded_file)  # This line is updated to handle uploaded_file correctly
         columns_to_drop = st.multiselect("Select columns to drop:", df.columns.tolist())
 
         df, categorical_cols, numerical_cols = preprocess_data(df, notebook_cells, columns_to_drop)
