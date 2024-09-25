@@ -8,6 +8,7 @@ from sklearn.cluster import KMeans
 from scipy import stats
 from io import StringIO
 import nbformat
+from io import BytesIO
 
 # Function to import CSV from BytesIO object.
 def import_notebook(uploaded_file):
@@ -189,111 +190,84 @@ def clustering_analysis(df, numerical_cols, notebook_cells):
     
     # KMeans Clustering
     num_clusters = st.slider("Select number of clusters for KMeans", min_value=1, max_value=10, value=3)
-    kmeans = KMeans(n_clusters=num_clusters, random_state=42)
-    df['Cluster'] = kmeans.fit_predict(df[numerical_cols])
-
-    # Visualizing the clusters using Plotly
-    st.write(f"#### KMeans Clustering with {num_clusters} Clusters")
-    fig = px.scatter(df, x=numerical_cols[0], y=numerical_cols[1], color='Cluster',
-                     title=f'KMeans Clustering with {num_clusters} Clusters', 
-                     color_continuous_scale=px.colors.sequential.Viridis)
-    st.plotly_chart(fig)
-    notebook_cells.append(nbformat.v4.new_code_cell(f"kmeans = KMeans(n_clusters={num_clusters}, random_state=42)\n"
-                                                    f"df['Cluster'] = kmeans.fit_predict(df[numerical_cols])\n"
-                                                    f"px.scatter(df, x='{numerical_cols[0]}', y='{numerical_cols[1]}', color='Cluster')"))
-
-
-# Function for statistical analysis
-def statistical_analysis(df, numerical_cols, notebook_cells):
-    st.write("**Statistical Analysis**")
-
-    # Descriptive statistics
-    st.write("### Descriptive Statistics")
-    descriptive_stats = df.describe()
-    st.write(descriptive_stats)
-    notebook_cells.append(nbformat.v4.new_code_cell("df.describe()"))
-
-    # Shapiro-Wilk test for normality
-    st.write("### Shapiro-Wilk Test for Normality")
-    normality_results = []
-
-    for col in numerical_cols:
-        stat, p_value = stats.shapiro(df[col].dropna())
-        normality_results.append({
-            "Column": col,
-            "Statistic": f"{stat:.3f}",
-            "p-value": f"{p_value:.3f}",
-            "Normal Distribution": "Yes" if p_value > 0.05 else "No"
-        })
-        notebook_cells.append(nbformat.v4.new_code_cell(
-            f"stat, p_value = stats.shapiro(df['{col}'].dropna())\n"
-            f"print(f'**{col}**: Statistics={{stat:.3f}}, p-value={{p_value:.3f}}')"
-        ))
-
-    # Display normality results as a table
-    st.table(pd.DataFrame(normality_results))
-
-    # Correlation analysis
-    st.write("### Correlation Analysis")
-    correlation_matrix = df[numerical_cols].corr()
-
-    # Display correlation matrix as a table
-    st.write("#### Correlation Coefficients")
-    st.table(correlation_matrix)
-
-
-# Main function to run the Streamlit app
-def main():
-    st.title("Data Analysis App")
+    kmeans = KMeans(n_clusters=num_clusters)
     
-    # Instructions
-    st.write("This app allows you to upload a CSV file, preprocess the data, and perform various analyses such as univariate, multivariate, and statistical analysis.")
+    # Fitting the model
+    kmeans.fit(df[numerical_cols])
+    
+    # Adding cluster column to the dataframe
+    df['Cluster'] = kmeans.labels_
+    st.success(f"Clustered data into {num_clusters} clusters.")
+    
+    # Plotting the clusters
+    st.write("### Cluster Visualization")
+    fig = px.scatter(df, x=numerical_cols[0], y=numerical_cols[1], color='Cluster', title='Cluster Visualization')
+    st.plotly_chart(fig)
 
-    # Upload CSV file
-    uploaded_file = st.file_uploader("Upload a CSV file", type=["csv"])
+    # Append code to notebook cells
+    notebook_cells.append(nbformat.v4.new_code_cell(f"""
+import pandas as pd
+from sklearn.cluster import KMeans
+
+num_clusters = {num_clusters}
+kmeans = KMeans(n_clusters=num_clusters)
+kmeans.fit(df[{numerical_cols}])
+df['Cluster'] = kmeans.labels_
+""""))
+    
+def create_notebook(notebook_cells):
+    """Creates a Jupyter Notebook from cells."""
+    nb = nbformat.v4.new_notebook()
+    nb.cells = notebook_cells
+    return nb
+
+
+def save_notebook(notebook):
+    """Saves the Jupyter notebook to BytesIO and returns the bytes."""
+    buffer = BytesIO()
+    nbformat.write(notebook, buffer)
+    buffer.seek(0)
+    return buffer.getvalue()
+
+
+def main():
+    st.title("Data Preprocessing and Analysis App")
+    uploaded_file = st.file_uploader("Upload your CSV file", type=["csv"])
+    
     if uploaded_file is not None:
-        with st.spinner("Loading data..."):
-            df = import_notebook(uploaded_file)
-            if df is None:
-                return  # Exit if there's an error reading the file
-
+        df = import_notebook(uploaded_file)
+        
+        if df is not None:
             notebook_cells = []
-
-            # Preprocess the data
+            st.write("### Initial Data Preview")
+            st.write(df.head())
+            notebook_cells.append(nbformat.v4.new_markdown_cell("## Initial Data Preview"))
+            notebook_cells.append(nbformat.v4.new_code_cell("df.head()"))
+            
+            # Data Preprocessing
+            st.write("## Data Preprocessing")
             columns_to_drop = st.multiselect("Select columns to drop", df.columns.tolist())
             df, categorical_cols, numerical_cols = preprocess_data(df, notebook_cells, columns_to_drop)
 
-            # Add download button for cleaned data
-            if st.button("Download Cleaned Dataset"):
-                cleaned_data = df.to_csv(index=False).encode('utf-8')
-                st.download_button(label="Download Cleaned Data",
-                                   data=cleaned_data,
-                                   file_name='cleaned_data.csv',
-                                   mime='text/csv')
-            
-            # Univariate analysis
-            if st.checkbox("Univariate Analysis"):
-                univariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
+            # Univariate Analysis
+            univariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
 
-            # Multivariate analysis
-            if st.checkbox("Multivariate Analysis"):
-                multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
+            # Multivariate Analysis
+            multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
 
-            # Clustering analysis
-            if st.checkbox("Clustering Analysis"):
-                clustering_analysis(df, numerical_cols, notebook_cells)
+            # Clustering Analysis
+            clustering_analysis(df, numerical_cols, notebook_cells)
 
-            # Statistical analysis
-            if st.checkbox("Statistical Analysis"):
-                statistical_analysis(df, numerical_cols, notebook_cells)
+            # Create and download notebook
+            notebook = create_notebook(notebook_cells)
+            notebook_bytes = save_notebook(notebook)
+            st.download_button(
+                label="Download Jupyter Notebook",
+                data=notebook_bytes,
+                file_name="data_analysis_notebook.ipynb",
+                mime="application/x-ipynb+json"
+            )
 
-            # Export notebook cells
-            if st.button("Export Notebook"):
-                notebook = nbformat.v4.new_notebook()
-                notebook.cells = notebook_cells
-                with open("analysis_notebook.ipynb", "w", encoding='utf-8') as f:  # Open in text mode with utf-8 encoding
-                    nbformat.write(notebook, f)
-                st.success("Notebook exported successfully!")
 
 if __name__ == "__main__":
     main()
