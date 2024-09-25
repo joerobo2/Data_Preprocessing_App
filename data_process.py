@@ -237,6 +237,10 @@ def bivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
 
 
 def main():
+    # Embed the updated banner image
+    banner_path = "EDA App Banner.png"  # Update to the correct path
+    st.image(banner_path, use_column_width=True)
+    
     st.title("Data Analysis App")
     notebook_cells = []
     
