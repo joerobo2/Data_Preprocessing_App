@@ -216,18 +216,22 @@ def multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
 # Statistical Analysis Function
 def statistical_analysis(df, numerical_cols, categorical_cols, notebook_cells):
     """Perform statistical analysis and add results to notebook cells."""
+    results_summary = []  # Initialize results_summary
+
     for num_col in numerical_cols:
         for cat_col in categorical_cols:
             # Example statistical test (t-test)
             groups = [df[num_col][df[cat_col] == cat_val] for cat_val in df[cat_col].unique()]
             if len(groups) == 2:  # Ensure there are two groups for t-test
                 t_stat, p_value = stats.ttest_ind(*groups)
+                result_message = f"# Statistical Analysis Results for {num_col} vs {cat_col}\n" \
+                                 f"t-statistic: {t_stat}, p-value: {p_value}"
+                
                 # Log the results in the notebook cells
-                notebook_cells.append(nbformat.v4.new_code_cell(f"""
-# Statistical Analysis Results for {num_col} vs {cat_col}
-t-statistic: {t_stat}, p-value: {p_value}
-"""))  # Ensure proper closing quotes
-
+                notebook_cells.append(nbformat.v4.new_code_cell(result_message))
+                
+                # Append the result message to results_summary for later display
+                results_summary.append(result_message)
 
     # Display summary of results
     st.write("**Statistical Analysis Summary**")
