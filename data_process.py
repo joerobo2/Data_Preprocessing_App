@@ -20,7 +20,7 @@ def import_notebook(uploaded_file):
         return None
     return df
 
-def preprocess_data(df, notebook_cells, columns_to_drop):
+def preprocess_data(df, notebook_cells, columns_to_drop, drop_na_all, drop_na_any, impute_numerical, impute_categorical, remove_duplicates, convert_to_category, winsorize_data):
     start_time = time.time()
     initial_rows = len(df)
     removed_rows_all = removed_rows_na = 0
@@ -30,63 +30,76 @@ def preprocess_data(df, notebook_cells, columns_to_drop):
         st.success(f"Dropped columns: {', '.join(columns_to_drop)}")
         notebook_cells.append(nbformat.v4.new_markdown_cell(f"## Dropped Columns: {', '.join(columns_to_drop)}"))
 
-    try:
-        df.dropna(how='all', inplace=True)
-        removed_rows_all = initial_rows - len(df)
-    except Exception as e:
-        st.error(f"Error removing rows with all missing values: {e}")
+    if drop_na_all:
+        try:
+            df.dropna(how='all', inplace=True)
+            removed_rows_all = initial_rows - len(df)
+        except Exception as e:
+            st.error(f"Error removing rows with all missing values: {e}")
 
-    try:
-        df.replace('', np.nan, inplace=True)
-        initial_rows_after_all = len(df)
-        df.dropna(inplace=True)
-        removed_rows_na = initial_rows_after_all - len(df)
-    except Exception as e:
-        st.error(f"Error removing rows with missing values: {e}")
+    if drop_na_any:
+        try:
+            df.replace('', np.nan, inplace=True)
+            initial_rows_after_all = len(df)
+            df.dropna(inplace=True)
+            removed_rows_na = initial_rows_after_all - len(df)
+        except Exception as e:
+            st.error(f"Error removing rows with missing values: {e}")
 
-    try:
+    if impute_numerical:
+        try:
+            numerical_cols = df.select_dtypes(include=['int64', 'float64']).columns
+            df[numerical_cols] = df[numerical_cols].fillna(df[numerical_cols].mean())
+            imputed_numerical = df[numerical_cols].isnull().sum().sum()
+        except Exception as e:
+            st.error(f"Error imputing missing numerical values: {e}")
+            imputed_numerical = 0
+    else:
         numerical_cols = df.select_dtypes(include=['int64', 'float64']).columns
-        df[numerical_cols] = df[numerical_cols].fillna(df[numerical_cols].mean())
-        imputed_numerical = df[numerical_cols].isnull().sum().sum()
-    except Exception as e:
-        st.error(f"Error imputing missing numerical values: {e}")
-        imputed_numerical = 0
 
-    try:
+    if impute_categorical:
+        try:
+            categorical_cols = df.select_dtypes(include=['object']).columns
+            for col in categorical_cols:
+                df[col] = df[col].fillna(df[col].mode()[0])
+            imputed_categorical = df[categorical_cols].isnull().sum().sum()
+        except Exception as e:
+            st.error(f"Error imputing missing categorical values: {e}")
+            imputed_categorical = 0
+    else:
         categorical_cols = df.select_dtypes(include=['object']).columns
-        for col in categorical_cols:
-            df[col] = df[col].fillna(df[col].mode()[0])
-        imputed_categorical = df[categorical_cols].isnull().sum().sum()
-    except Exception as e:
-        st.error(f"Error imputing missing categorical values: {e}")
-        imputed_categorical = 0
 
-    try:
-        initial_rows = len(df)
-        df.drop_duplicates(inplace=True)
-        removed_duplicates = initial_rows - len(df)
-    except Exception as e:
-        st.error(f"Error removing duplicate rows: {e}")
+    if remove_duplicates:
+        try:
+            initial_rows = len(df)
+            df.drop_duplicates(inplace=True)
+            removed_duplicates = initial_rows - len(df)
+        except Exception as e:
+            st.error(f"Error removing duplicate rows: {e}")
+            removed_duplicates = 0
+    else:
         removed_duplicates = 0
 
-    try:
-        for col in categorical_cols:
-            if df[col].nunique() / len(df) < 0.5:
-                df[col] = df[col].astype('category')
-    except Exception as e:
-        st.error(f"Error converting columns to category type: {e}")
+    if convert_to_category:
+        try:
+            for col in categorical_cols:
+                if df[col].nunique() / len(df) < 0.5:
+                    df[col] = df[col].astype('category')
+        except Exception as e:
+            st.error(f"Error converting columns to category type: {e}")
 
     winsorized_rows = []
     winsorize_limits = [0.05, 0.05]
-    try:
-        for col in numerical_cols:
-            original_data = df[col].copy()
-            df[col] = stats.mstats.winsorize(df[col], limits=winsorize_limits)
-            winsorized_diff = (original_data != df[col]).sum()
-            if winsorized_diff > 0:
-                winsorized_rows.append(winsorized_diff)
-    except Exception as e:
-        st.error(f"Error winsorizing data: {e}")
+    if winsorize_data:
+        try:
+            for col in numerical_cols:
+                original_data = df[col].copy()
+                df[col] = stats.mstats.winsorize(df[col], limits=winsorize_limits)
+                winsorized_diff = (original_data != df[col]).sum()
+                if winsorized_diff > 0:
+                    winsorized_rows.append(winsorized_diff)
+        except Exception as e:
+            st.error(f"Error winsorizing data: {e}")
 
     preprocess_time = time.time() - start_time
     st.write(f"Preprocessing took {preprocess_time:.2f} seconds")
@@ -116,13 +129,13 @@ def preprocess_data(df, notebook_cells, columns_to_drop):
         "    df[col] = winsorize(df[col], limits=[0.05, 0.05])"
     ))
 
-    notebook_cells.append(nbformat.v4.new_markdown_cell(f"- Removed {removed_rows_all} rows with all missing values."))
-    notebook_cells.append(nbformat.v4.new_markdown_cell(f"- Removed {removed_rows_na} rows with missing values."))
+    notebook_cells.append(nbformat.v4.new_markdown_cell(f"- Removed {removed_rows_all} rows with all missing values." if drop_na_all else "- Did not remove rows with all missing values."))
+    notebook_cells.append(nbformat.v4.new_markdown_cell(f"- Removed {removed_rows_na} rows with missing values." if drop_na_any else "- Did not remove rows with any missing values."))
     imputation_summary = [
         f"- Imputed {imputed_numerical} missing numerical values." if imputed_numerical > 0 else "- No missing numerical values imputed.",
         f"- Imputed {imputed_categorical} missing categorical values." if imputed_categorical > 0 else "- No missing categorical values imputed.",
         f"- Removed {removed_duplicates} duplicate rows." if removed_duplicates > 0 else "- No duplicate rows removed.",
-        f"- Winsorized: {len(winsorized_rows)} rows, {len(numerical_cols)} cols using limits {winsorize_limits}."
+        f"- Winsorized: {len(winsorized_rows)} rows, {len(numerical_cols)} cols using limits {winsorize_limits}." if winsorize_data else "- Did not winsorize data."
     ]
     for summary in imputation_summary:
         st.markdown(summary)
@@ -157,49 +170,64 @@ def univariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
         notebook_cells.append(nbformat.v4.new_code_cell(f"px.histogram(df, x='{col}')"))
 
 
-# Function for multivariate analysis
+# Function for multivariate analysis using Plotly
 def multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
-    st.write("## Multivariate Analysis")
-    st.write("### Correlation Matrix")
-    
-    if numerical_cols.size > 1:  # Ensure there are enough numerical columns for correlation matrix
-        correlation = df[numerical_cols].corr()
-        fig = px.imshow(correlation, title="Correlation Matrix", color_continuous_scale='Viridis')
+    st.write("**Multivariate Analysis**")
+
+    # Pairplot for numerical columns
+    if len(numerical_cols) > 1:
+        st.write("### Pairplot of numerical columns")
+        fig = px.scatter_matrix(df[numerical_cols], title='Scatter Matrix of Numerical Columns')
         st.plotly_chart(fig)
-        notebook_cells.append(nbformat.v4.new_code_cell("df.corr()"))
+        notebook_cells.append(nbformat.v4.new_code_cell("px.scatter_matrix(df[numerical_cols])"))
 
-    st.write("### Scatter Matrix")
-    if len(numerical_cols) > 1:  # Ensure there are enough numerical columns for scatter matrix
-        fig = px.scatter_matrix(df, dimensions=numerical_cols, title="Scatter Matrix")
-        st.plotly_chart(fig)
-        notebook_cells.append(nbformat.v4.new_code_cell(f"px.scatter_matrix(df, dimensions={list(numerical_cols)})"))
+    # Correlation heatmap using Plotly
+    st.write("### Correlation Heatmap")
+    correlation_matrix = df[numerical_cols].corr()
+    fig = go.Figure(data=go.Heatmap(
+        z=correlation_matrix.values,
+        x=correlation_matrix.columns,
+        y=correlation_matrix.index,
+        colorscale='Viridis',
+        colorbar=dict(title='Correlation'),
+        zmin=-1,
+        zmax=1
+    ))
+    fig.update_layout(title='Correlation Heatmap', xaxis_title='Variables', yaxis_title='Variables')
+    st.plotly_chart(fig)
+    notebook_cells.append(nbformat.v4.new_code_cell("go.Figure(data=go.Heatmap(...))"))
 
 
-# Function for clustering analysis
 def clustering_analysis(df, numerical_cols, notebook_cells):
-    st.write("## Clustering Analysis")
-    num_clusters = st.number_input("Select number of clusters", min_value=1, max_value=10, value=3)
+    st.write("### Clustering Analysis")
     
-    if st.button("Run KMeans Clustering"):
-        kmeans = KMeans(n_clusters=num_clusters)
-        kmeans.fit(df[numerical_cols])
-        df['Cluster'] = kmeans.labels_
+    # KMeans Clustering
+    num_clusters = st.slider("Select number of clusters for KMeans", min_value=1, max_value=10, value=3)
+    kmeans = KMeans(n_clusters=num_clusters)
+    
+    # Fitting the model
+    kmeans.fit(df[numerical_cols])
+    
+    # Adding cluster column to the dataframe
+    df['Cluster'] = kmeans.labels_
+    st.success(f"Clustered data into {num_clusters} clusters.")
+    
+    # Plotting the clusters
+    st.write("### Cluster Visualization")
+    fig = px.scatter(df, x=numerical_cols[0], y=numerical_cols[1], color='Cluster', title='Cluster Visualization')
+    st.plotly_chart(fig)
 
-        # Visualizing clusters
-        st.write("### Cluster Visualization")
-        fig = px.scatter(df, x=numerical_cols[0], y=numerical_cols[1], color='Cluster', title='Cluster Visualization')
-        st.plotly_chart(fig)
+    # Append code to notebook cells
+    notebook_cells.append(nbformat.v4.new_code_cell(f"""
+import pandas as pd
+from sklearn.cluster import KMeans
 
-        # Append code to notebook cells
-        notebook_cells.append(nbformat.v4.new_code_cell(f"""
-        from sklearn.cluster import KMeans
-        num_clusters = {num_clusters}
-        kmeans = KMeans(n_clusters=num_clusters)
-        kmeans.fit(df[{list(numerical_cols)}])
-        df['Cluster'] = kmeans.labels_
-        """))
-
-
+num_clusters = {num_clusters}
+kmeans = KMeans(n_clusters=num_clusters)
+kmeans.fit(df[{numerical_cols}])
+df['Cluster'] = kmeans.labels_
+""""))
+    
 def create_notebook(notebook_cells):
     """Creates a Jupyter Notebook from cells."""
     nb = nbformat.v4.new_notebook()
@@ -232,7 +260,23 @@ def main():
             # Data Preprocessing
             st.write("## Data Preprocessing")
             columns_to_drop = st.multiselect("Select columns to drop", df.columns.tolist())
-            df, categorical_cols, numerical_cols = preprocess_data(df, notebook_cells, columns_to_drop)
+            drop_na_all = st.checkbox("Drop rows with all missing values", value=False)
+            drop_na_any = st.checkbox("Drop rows with any missing values", value=False)
+            impute_numerical = st.checkbox("Impute missing numerical values with mean", value=True)
+            impute_categorical = st.checkbox("Impute missing categorical values with mode", value=True)
+            remove_duplicates = st.checkbox("Remove duplicate rows", value=True)
+            convert_to_category = st.checkbox("Convert categorical columns to category dtype", value=True)
+            winsorize_data = st.checkbox("Winsorize numerical columns", value=True)
+
+            df, categorical_cols, numerical_cols = preprocess_data(df, notebook_cells, columns_to_drop, drop_na_all, drop_na_any, impute_numerical, impute_categorical, remove_duplicates, convert_to_category, winsorize_data)
+
+            # Provide option to download cleaned dataset
+            st.download_button(
+                label="Download Cleaned Dataset",
+                data=df.to_csv(index=False),
+                file_name='cleaned_dataset.csv',
+                mime='text/csv'
+            )
 
             # Univariate Analysis
             univariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
