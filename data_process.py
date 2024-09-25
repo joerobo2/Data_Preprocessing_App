@@ -17,7 +17,8 @@ def import_notebook(uploaded_file):
     try:
         df = pd.read_csv(uploaded_file)  # Read directly from the uploaded file
     except Exception as e:
-        raise ValueError(f"Error reading the CSV file: {e}")
+        st.error(f"Error reading the CSV file: {e}")
+        return None
     return df
 
 def preprocess_data(df, notebook_cells, columns_to_drop):
@@ -223,8 +224,8 @@ def statistical_analysis(df, numerical_cols, notebook_cells):
         })
         notebook_cells.append(nbformat.v4.new_code_cell(
             f"stat, p_value = stats.shapiro(df['{col}'].dropna())\n"
-            f"print(f'**{col}**: Statistics={{stat:.3f}}, p-value={{p_value:.3f}}')")
-        )
+            f"print(f'**{col}**: Statistics={{stat:.3f}}, p-value={{p_value:.3f}}')"
+        ))
 
     # Display normality results as a table
     st.table(pd.DataFrame(normality_results))
@@ -246,36 +247,51 @@ def statistical_analysis(df, numerical_cols, notebook_cells):
 # Main function to run the Streamlit app
 def main():
     st.title("Data Analysis App")
+    
+    # Instructions
+    st.write("This app allows you to upload a CSV file, preprocess the data, and perform various analyses such as univariate, multivariate, and statistical analysis.")
 
     # Upload CSV file
     uploaded_file = st.file_uploader("Upload a CSV file", type=["csv"])
     if uploaded_file is not None:
-        df = import_notebook(uploaded_file)
-        notebook_cells = []
+        with st.spinner("Loading data..."):
+            df = import_notebook(uploaded_file)
+            if df is None:
+                return  # Exit if there's an error reading the file
 
-        # Preprocess the data
-        columns_to_drop = st.multiselect("Select columns to drop", df.columns.tolist())
-        df, categorical_cols, numerical_cols = preprocess_data(df, notebook_cells, columns_to_drop)
+            notebook_cells = []
 
-        # Univariate analysis
-        if st.checkbox("Univariate Analysis"):
-            univariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
+            # Preprocess the data
+            columns_to_drop = st.multiselect("Select columns to drop", df.columns.tolist())
+            df, categorical_cols, numerical_cols = preprocess_data(df, notebook_cells, columns_to_drop)
 
-        # Multivariate analysis
-        if st.checkbox("Multivariate Analysis"):
-            multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
+            # Add download button for cleaned data
+            if st.button("Download Cleaned Dataset"):
+                cleaned_data = df.to_csv(index=False).encode('utf-8')
+                st.download_button(label="Download Cleaned Data",
+                                   data=cleaned_data,
+                                   file_name='cleaned_data.csv',
+                                   mime='text/csv')
+            
+            # Univariate analysis
+            if st.checkbox("Univariate Analysis"):
+                univariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
 
-        # Statistical analysis
-        if st.checkbox("Statistical Analysis"):
-            statistical_analysis(df, numerical_cols, notebook_cells)
+            # Multivariate analysis
+            if st.checkbox("Multivariate Analysis"):
+                multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
 
-        # Export notebook cells
-        if st.button("Export Notebook"):
-            notebook = nbformat.v4.new_notebook()
-            notebook.cells = notebook_cells
-            with open("analysis_notebook.ipynb", "w", encoding='utf-8') as f:  # Open in text mode with utf-8 encoding
-                nbformat.write(notebook, f)
-            st.success("Notebook exported successfully!")
+            # Statistical analysis
+            if st.checkbox("Statistical Analysis"):
+                statistical_analysis(df, numerical_cols, notebook_cells)
+
+            # Export notebook cells
+            if st.button("Export Notebook"):
+                notebook = nbformat.v4.new_notebook()
+                notebook.cells = notebook_cells
+                with open("analysis_notebook.ipynb", "w", encoding='utf-8') as f:  # Open in text mode with utf-8 encoding
+                    nbformat.write(notebook, f)
+                st.success("Notebook exported successfully!")
 
 if __name__ == "__main__":
     main()
