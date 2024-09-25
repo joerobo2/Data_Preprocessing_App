@@ -249,6 +249,9 @@ def main():
         if st.checkbox("Perform Multivariate Analysis"):
             multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
         
+        if st.checkbox("Perform Clustering Analysis"):
+            multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)  # Reuse for clustering analysis
+
         if st.checkbox("Perform T-tests and ANOVA"):
             statistical_analysis(df, numerical_cols, categorical_cols, notebook_cells)
 
@@ -258,8 +261,11 @@ def main():
             # Add text input for user to specify the file path
             file_path = st.text_input("Specify file path to save the notebook (including .ipynb):", 'analysis_notebook.ipynb')
             if st.button("Save Notebook"):
-                export_notebook_cells(notebook_cells, file_path)
-                st.success(f"Notebook exported successfully to {file_path}!")
+                try:
+                    export_notebook_cells(notebook_cells, file_path)
+                    st.success(f"Notebook exported successfully to {file_path}!")
+                except Exception as e:
+                    st.error(f"Error saving notebook: {e}")
 
 if __name__ == "__main__":
     main()
