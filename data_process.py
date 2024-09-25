@@ -98,7 +98,7 @@ def preprocess_data(df, notebook_cells, columns_to_drop):
                 if winsorized_diff > 0:
                     winsorized_rows.append(winsorized_diff)
     except Exception as e:
-       st.error(f"Error winsorizing data: {e}")
+        st.error(f"Error winsorizing data: {e}")
 
     preprocess_time = time.time() - start_time
     st.write(f"Preprocessing took {preprocess_time:.2f} seconds")
@@ -123,6 +123,7 @@ def preprocess_data(df, notebook_cells, columns_to_drop):
     st.text(s)
 
     return df, categorical_cols, numerical_cols
+
 
 def univariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
     st.header("Univariate Analysis")
@@ -182,7 +183,7 @@ def multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
 
 def bivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
     st.header("Bivariate Analysis")
-    if numerical_cols and categorical_cols:  # <--- This line may cause the error
+    if len(numerical_cols) > 0 and len(categorical_cols) > 0:  # Fixed the check
         cat_col = st.selectbox("Select categorical column for box plot", categorical_cols.tolist())
         num_col = st.selectbox("Select numerical column for box plot", numerical_cols.tolist())
         st.subheader(f"Box Plot of {num_col} by {cat_col}")
