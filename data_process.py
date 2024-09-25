@@ -273,7 +273,7 @@ def main():
         if st.button("Export Notebook"):
             notebook = nbformat.v4.new_notebook()
             notebook.cells = notebook_cells
-            with open("analysis_notebook.ipynb", "w") as f:
+            with open("analysis_notebook.ipynb", "w", encoding='utf-8') as f:  # Open in text mode with utf-8 encoding
                 nbformat.write(notebook, f)
             st.success("Notebook exported successfully!")
 
