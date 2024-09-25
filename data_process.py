@@ -267,6 +267,14 @@ def statistical_analysis(df, numerical_cols, categorical_cols, notebook_cells):
     notebook_cells.append(nbformat.v4.new_markdown_cell("## ANOVA Results"))
     notebook_cells.append(nbformat.v4.new_code_cell("import pandas as pd\n" + anova_df.to_string(index=False)))
 
+# Exporting the Notebook Function
+def export_notebook_cells(notebook_cells, file_path):
+    """Export notebook cells to a .ipynb file."""
+    nb = nbformat.v4.new_notebook()
+    nb.cells = notebook_cells
+    with open(file_path, 'w') as f:
+        nbformat.write(nb, f)
+
 # Main function for the Streamlit app
 def main():
     # Embed the updated banner image
