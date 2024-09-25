@@ -85,18 +85,20 @@ def preprocess_data(df, notebook_cells, columns_to_drop):
             df[col] = df[col].astype('category')
 
     # Winsorization process
-    winsorized_rows = []
-    winsorize_limits = [0.05, 0.05]
-    try:
-        for col in numerical_cols:
-            if col in df.columns:  # Ensure column exists before winsorizing
-                original_data = df[col].copy()
-                df[col] = winsorize(df[col], limits=winsorize_limits)
+winsorized_rows = []
+winsorize_limits = [0.05, 0.05]
+try:
+    for col in numerical_cols:
+        if col in df.columns and not df[col].empty:  # Check if column exists and is not empty
+            original_data = df[col].copy()
+            # Check if original_data has valid numeric types
+            if pd.api.types.is_numeric_dtype(original_data):
+                df[col] = winsorize(original_data, limits=winsorize_limits)
                 winsorized_diff = (original_data != df[col]).sum()
                 if winsorized_diff > 0:
                     winsorized_rows.append(winsorized_diff)
-    except Exception as e:
-        st.error(f"Error winsorizing data: {e}")
+except Exception as e:
+    st.error(f"Error winsorizing data: {e}")
 
     preprocess_time = time.time() - start_time
     st.write(f"Preprocessing took {preprocess_time:.2f} seconds")
