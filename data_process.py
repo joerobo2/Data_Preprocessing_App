@@ -224,7 +224,7 @@ def statistical_analysis(df, numerical_cols, notebook_cells):
         notebook_cells.append(nbformat.v4.new_code_cell(
             f"stat, p_value = stats.shapiro(df['{col}'].dropna())\n"
             f"print(f'**{col}**: Statistics={{stat:.3f}}, p-value={{p_value:.3f}}')")
-        ))
+        )
 
     # Display normality results as a table
     st.table(pd.DataFrame(normality_results))
