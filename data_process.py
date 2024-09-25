@@ -249,9 +249,6 @@ def main():
         if st.checkbox("Perform Multivariate Analysis"):
             multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
         
-        if st.checkbox("Perform Clustering Analysis"):
-            multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)  # Reuse for clustering analysis
-
         if st.checkbox("Perform T-tests and ANOVA"):
             statistical_analysis(df, numerical_cols, categorical_cols, notebook_cells)
 
