@@ -224,24 +224,20 @@ def statistical_analysis(df, numerical_cols, categorical_cols, notebook_cells):
                 # Log the results in the notebook cells
                 notebook_cells.append(nbformat.v4.new_code_cell(f"""
 
-# Function for statistical analysis
 def statistical_analysis(df, numerical_cols, categorical_cols, notebook_cells):
     """Perform statistical analysis and add results to notebook cells."""
-    results_summary = []
-
     for num_col in numerical_cols:
         for cat_col in categorical_cols:
             # Example statistical test (t-test)
             groups = [df[num_col][df[cat_col] == cat_val] for cat_val in df[cat_col].unique()]
             if len(groups) == 2:  # Ensure there are two groups for t-test
                 t_stat, p_value = stats.ttest_ind(*groups)
-                results_summary.append(f"Statistical Analysis Results for {num_col} vs {cat_col}:\n"
-                                       f"  - t-statistic: {t_stat:.4f}, p-value: {p_value:.4f}")
                 # Log the results in the notebook cells
                 notebook_cells.append(nbformat.v4.new_code_cell(f"""
-                # Statistical Analysis Results for {num_col} vs {cat_col}
-                t-statistic: {t_stat}, p-value: {p_value} 
-                """))
+# Statistical Analysis Results for {num_col} vs {cat_col}
+t-statistic: {t_stat}, p-value: {p_value}
+"""))
+
 
     # Display summary of results
     st.write("**Statistical Analysis Summary**")
