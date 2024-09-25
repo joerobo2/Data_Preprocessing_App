@@ -358,6 +358,11 @@ def t_test(df, categorical_cols, numerical_cols):
 # Streamlit App
 # Main function for the Streamlit app
 def main():
+    # Embed the updated banner image
+    banner_path = "EDA App Banner.png"  # Update to the correct path
+    st.image(banner_path, use_column_width=True)
+    
+    # Title
     st.title("Exploratory Data Analysis App")
 
     # Select CSV file
