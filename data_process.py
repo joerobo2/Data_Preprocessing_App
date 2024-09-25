@@ -254,7 +254,11 @@ def save_notebook(notebook):
 
 
 def main():
-    st.title("Data Preprocessing and Analysis App")
+    # Embed the updated banner image
+    banner_path = "EDA App Banner.png"  # Update to the correct path
+    st.image(banner_path, use_column_width=True)
+
+    st.title("Data Analysis App")
     uploaded_file = st.file_uploader("Upload your CSV file", type=["csv"])
 
     if uploaded_file is not None:
