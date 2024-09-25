@@ -239,9 +239,9 @@ def statistical_analysis(df, numerical_cols, categorical_cols, notebook_cells):
                                        f"  - t-statistic: {t_stat:.4f}, p-value: {p_value:.4f}")
                 # Log the results in the notebook cells
                 notebook_cells.append(nbformat.v4.new_code_cell(f"""
-# Statistical Analysis Results for {num_col} vs {cat_col}
-t-statistic: {t_stat}, p-value: {p_value}
-"""))
+                # Statistical Analysis Results for {num_col} vs {cat_col}
+                t-statistic: {t_stat}, p-value: {p_value} 
+                """))
 
     # Display summary of results
     st.write("**Statistical Analysis Summary**")
