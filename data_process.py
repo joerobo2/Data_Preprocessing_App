@@ -5,6 +5,7 @@ import scipy.stats as stats
 import time
 import numpy as np
 import streamlit as st
+import io
 from io import StringIO
 from scipy.stats.mstats import winsorize
 import pandas as pd
