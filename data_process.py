@@ -239,30 +239,40 @@ def anova_test(df, categorical_cols, numerical_cols):
         st.write(summary_df)
 
 
-# Function for T-tests
+# Function for T-test across all numerical columns
 def t_test(df, categorical_cols, numerical_cols):
-    st.write("**T-Test**")
+    st.write("**T-test Summary**")
 
     if len(categorical_cols) > 0 and len(numerical_cols) > 0:
-        cat_col = st.selectbox("Select categorical column for T-test", categorical_cols)
-        num_col = st.selectbox("Select numerical column for T-test", numerical_cols)
+        cat_col = st.selectbox("Select categorical column for T-tests", categorical_cols)
+        
+        # Initialize a summary table
+        summary_data = {
+            "Numerical Column": [],
+            "T-statistic": [],
+            "p-value": [],
+            "Significance": []
+        }
 
-        if st.button("Run T-test"):
-            unique_values = df[cat_col].unique()
-            if len(unique_values) != 2:
-                st.error("T-test requires exactly two groups.")
-                return
+        # Ensure the categorical column has exactly two groups for T-test
+        if df[cat_col].nunique() == 2:
+            for num_col in numerical_cols:
+                group1 = df[df[cat_col] == df[cat_col].unique()[0]][num_col]
+                group2 = df[df[cat_col] == df[cat_col].unique()[1]][num_col]
+                
+                t_stat, p_val = stats.ttest_ind(group1, group2, nan_policy='omit')
 
-            group1 = df[df[cat_col] == unique_values[0]][num_col]
-            group2 = df[df[cat_col] == unique_values[1]][num_col]
+                summary_data["Numerical Column"].append(num_col)
+                summary_data["T-statistic"].append(t_stat)
+                summary_data["p-value"].append(p_val)
+                summary_data["Significance"].append("Reject H0" if p_val < 0.05 else "Fail to Reject H0")
 
-            t_stat, p_val = stats.ttest_ind(group1, group2)
+            # Create a DataFrame from the summary data
+            summary_df = pd.DataFrame(summary_data)
 
-            st.write(f"T-statistic: {t_stat:.4f}, p-value: {p_val:.4f}")
-            if p_val < 0.05:
-                st.success("Reject the null hypothesis: means are significantly different.")
-            else:
-                st.warning("Fail to reject the null hypothesis: no significant difference in means.")
+            st.write(summary_df)
+        else:
+            st.warning("T-test requires exactly two groups in the selected categorical column.")
 
 
 # Streamlit App
