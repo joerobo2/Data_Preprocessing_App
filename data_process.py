@@ -232,8 +232,11 @@ def export_notebook_cells(notebook_cells, filepath):
     """Export notebook cells to a specified file."""
     nb = nbformat.v4.new_notebook()
     nb.cells = notebook_cells
-    with open(filepath, 'w') as f:
-        nbformat.write(nb, f)
+    try:
+        with open(filepath, 'w') as f:
+            nbformat.write(nb, f)
+    except Exception as e:
+        raise IOError(f"Could not save notebook to {filepath}: {e}")
 
 # Main function for the Streamlit app
 def main():
@@ -246,22 +249,22 @@ def main():
 
     if uploaded_file is not None:
         notebook_cells = []
-        
+
         # Add dataset reading cell
         notebook_cells.append(nbformat.v4.new_code_cell("df = pd.read_csv('uploaded_file.csv')"))
-        
+
         df = import_notebook(uploaded_file)  # Ensure you have this function defined
         columns_to_drop = st.multiselect("Select columns to drop:", df.columns.tolist())
 
         df, categorical_cols, numerical_cols = preprocess_data(df, notebook_cells, columns_to_drop)  # Ensure this function is defined
-        
+
         # Checkboxes for analysis functions
         if st.checkbox("Perform Univariate Analysis"):
             univariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)  # Ensure this is defined
-        
+
         if st.checkbox("Perform Multivariate Analysis"):
             multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)  # Ensure this is defined
-        
+
         if st.checkbox("Perform T-tests and ANOVA"):
             statistical_analysis(df, numerical_cols, categorical_cols, notebook_cells)
 
@@ -271,11 +274,14 @@ def main():
             # Add text input for user to specify the file path
             file_path = st.text_input("Specify file path to save the notebook (including .ipynb):", 'analysis_notebook.ipynb')
             if st.button("Save Notebook"):
-                try:
-                    export_notebook_cells(notebook_cells, file_path)
-                    st.success(f"Notebook exported successfully to {file_path}!")
-                except Exception as e:
-                    st.error(f"Error saving notebook: {e}")
+                if not file_path.endswith('.ipynb'):
+                    st.error("File path must end with '.ipynb'")
+                else:
+                    try:
+                        export_notebook_cells(notebook_cells, file_path)
+                        st.success(f"Notebook exported successfully to {file_path}!")
+                    except Exception as e:
+                        st.error(f"Error saving notebook: {e}")
 
 if __name__ == "__main__":
     main()
