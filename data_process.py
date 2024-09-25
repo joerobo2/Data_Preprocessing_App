@@ -118,18 +118,6 @@ def preprocess_data(df, notebook_cells, columns_to_drop):
 
     notebook_cells.append(nbformat.v4.new_markdown_cell(f"- Removed {removed_rows_all} rows with all missing values."))
     notebook_cells.append(nbformat.v4.new_markdown_cell(f"- Removed {removed_rows_na} rows with missing values."))
-    notebook_cells.append(nbformat.v4.new_markdown_cell(
-        f"- Imputed {imputed_numerical} missing numerical values." if imputed_numerical > 0 else "- No missing numerical values imputed."))
-    notebook_cells.append(nbformat.v4.new_markdown_cell(
-        f"- Imputed {imputed_categorical} missing categorical values." if imputed_categorical > 0 else "- No missing categorical values imputed."))
-    notebook_cells.append(nbformat.v4.new_markdown_cell(
-        f"- Removed {removed_duplicates} duplicate rows." if removed_duplicates > 0 else "- No duplicate rows removed."))
-    notebook_cells.append(nbformat.v4.new_markdown_cell(
-        f"- Winsorized: {len(winsorized_rows)} rows, {len(numerical_cols)} cols using limits {winsorize_limits}."))
-
-    st.write("**Preprocessing Summary**")
-    st.markdown(f"- Removed {removed_rows_all} rows with all missing values.")
-    st.markdown(f"- Removed {removed_rows_na} rows with missing values.")
     imputation_summary = [
         f"- Imputed {imputed_numerical} missing numerical values." if imputed_numerical > 0 else "- No missing numerical values imputed.",
         f"- Imputed {imputed_categorical} missing categorical values." if imputed_categorical > 0 else "- No missing categorical values imputed.",
@@ -186,66 +174,136 @@ def multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
     st.write("### Correlation heatmap")
     correlation_matrix = df[numerical_cols].corr()
     fig, ax = plt.subplots()
-    sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', ax=ax)
+    sns.heatmap(correlation_matrix, annot=True, fmt=".2f", cmap='coolwarm', ax=ax)
     st.pyplot(fig)
-    notebook_cells.append(nbformat.v4.new_code_cell("sns.heatmap(df[numerical_cols].corr(), annot=True, cmap='coolwarm')"))
+    notebook_cells.append(nbformat.v4.new_code_cell("sns.heatmap(correlation_matrix, annot=True, fmt='.2f', cmap='coolwarm')"))
 
+    # Clustering
+    clustering_analysis(df, numerical_cols, notebook_cells)
 
-# Function to export the notebook
-def export_notebook_cells(notebook_cells):
-    """Export notebook cells to a .ipynb file in memory."""
-    nb = nbformat.v4.new_notebook()
-    nb.cells = notebook_cells
+def clustering_analysis(df, numerical_cols, notebook_cells):
+    st.write("### Clustering Analysis")
     
-    # Use BytesIO to hold the notebook data in memory
-    with io.BytesIO() as buf:
-        nbformat.write(nb, buf)  # Write to the buffer
-        buf.seek(0)  # Move to the beginning of the buffer
-        return buf.getvalue()  # Return the bytes of the notebook
+    # KMeans Clustering
+    num_clusters = st.slider("Select number of clusters for KMeans", min_value=1, max_value=10, value=3)
+    kmeans = KMeans(n_clusters=num_clusters, random_state=42)
+    df['Cluster'] = kmeans.fit_predict(df[numerical_cols])
+
+    # Visualizing the clusters
+    st.write(f"#### KMeans Clustering with {num_clusters} Clusters")
+    fig, ax = plt.subplots()
+    sns.scatterplot(data=df, x=numerical_cols[0], y=numerical_cols[1], hue='Cluster', palette='Set1', ax=ax)
+    st.pyplot(fig)
+    notebook_cells.append(nbformat.v4.new_code_cell(f"kmeans = KMeans(n_clusters={num_clusters}, random_state=42)\n"
+                                                     f"df['Cluster'] = kmeans.fit_predict(df[numerical_cols])\n"
+                                                     "sns.scatterplot(data=df, x=numerical_cols[0], y=numerical_cols[1], hue='Cluster', palette='Set1')"))
 
 
-# Main Streamlit application
+# Function to perform statistical analysis
+def statistical_analysis(df, categorical_cols, numerical_cols, notebook_cells):
+    st.write("**Statistical Analysis**")
+
+    # Display basic statistics
+    st.write("### Basic Statistics")
+    st.write(df[numerical_cols].describe())
+    notebook_cells.append(nbformat.v4.new_code_cell("df[numerical_cols].describe()"))
+
+    # Normality test for numerical columns
+    st.write("### Normality Tests")
+    for col in numerical_cols:
+        stat, p_value = stats.shapiro(df[col].dropna())
+        st.write(f"{col}: Shapiro-Wilk Test Statistic = {stat:.4f}, p-value = {p_value:.4f}")
+        notebook_cells.append(nbformat.v4.new_code_cell(f"stats.shapiro(df['{col}'].dropna())"))
+
+    # Correlation test between pairs of numerical columns
+    st.write("### Correlation Tests")
+    for i in range(len(numerical_cols)):
+        for j in range(i + 1, len(numerical_cols)):
+            col1, col2 = numerical_cols[i], numerical_cols[j]
+            correlation, p_value = stats.pearsonr(df[col1].dropna(), df[col2].dropna())
+            st.write(f"Correlation between {col1} and {col2}: Pearson Correlation = {correlation:.4f}, p-value = {p_value:.4f}")
+            notebook_cells.append(nbformat.v4.new_code_cell(f"stats.pearsonr(df['{col1}'].dropna(), df['{col2}'].dropna())"))
+
+    # ANOVA Tests
+    st.write("### ANOVA Tests")
+    anova_results = []
+    for num_col in numerical_cols:
+        for cat_col in categorical_cols:
+            if df[cat_col].nunique() > 1:
+                f_val, p_val = stats.f_oneway(*(df[num_col][df[cat_col] == category] for category in df[cat_col].unique()))
+                anova_results.append((num_col, cat_col, f_val, p_val))
+                st.write(f"ANOVA between {num_col} and {cat_col}: F-statistic = {f_val:.4f}, p-value = {p_val:.4f}")
+                notebook_cells.append(nbformat.v4.new_code_cell(
+                    f"stats.f_oneway(*[df['{num_col}'][df['{cat_col}'] == category] for category in df['{cat_col}'].unique()])"
+                ))
+
+    # Display ANOVA Summary Table
+    if anova_results:
+        st.write("#### ANOVA Summary Table")
+        anova_df = pd.DataFrame(anova_results, columns=['Numerical Column', 'Categorical Column', 'F-statistic', 'p-value'])
+        st.write(anova_df)
+        notebook_cells.append(nbformat.v4.new_code_cell("anova_df = pd.DataFrame(anova_results, columns=['Numerical Column', 'Categorical Column', 'F-statistic', 'p-value'])\n"
+                                                        "st.write(anova_df)"))
+
+    # T-Test between numerical columns based on categories
+    st.write("### T-Test Summary")
+    ttest_results = []
+    for num_col in numerical_cols:
+        for cat_col in categorical_cols:
+            unique_categories = df[cat_col].unique()
+            if len(unique_categories) == 2:  # T-test is applicable only for two groups
+                group1 = df[num_col][df[cat_col] == unique_categories[0]]
+                group2 = df[num_col][df[cat_col] == unique_categories[1]]
+                t_stat, p_val = stats.ttest_ind(group1.dropna(), group2.dropna())
+                ttest_results.append((num_col, cat_col, t_stat, p_val))
+                st.write(f"T-Test between {num_col} and {cat_col}: T-statistic = {t_stat:.4f}, p-value = {p_val:.4f}")
+                notebook_cells.append(nbformat.v4.new_code_cell(
+                    f"stats.ttest_ind(df['{num_col}'][df['{cat_col}'] == '{unique_categories[0]}'].dropna(), df['{num_col}'][df['{cat_col}'] == '{unique_categories[1]}'].dropna())"
+                ))
+
+    # Display T-Test Summary Table
+    if ttest_results:
+        st.write("#### T-Test Summary Table")
+        ttest_df = pd.DataFrame(ttest_results, columns=['Numerical Column', 'Categorical Column', 'T-statistic', 'p-value'])
+        st.write(ttest_df)
+        notebook_cells.append(nbformat.v4.new_code_cell("ttest_df = pd.DataFrame(ttest_results, columns=['Numerical Column', 'Categorical Column', 'T-statistic', 'p-value'])\n"
+                                                        "st.write(ttest_df)"))
+
+
+# Function to run the Streamlit app
 def main():
     st.title("Data Analysis App")
-    
+
     uploaded_file = st.file_uploader("Upload a CSV file", type=["csv"])
     
-    notebook_cells = []  # This will store all the notebook cells for export
-
     if uploaded_file is not None:
         df = import_notebook(uploaded_file)
-        notebook_cells.append(nbformat.v4.new_markdown_cell("# Data Analysis"))
+        notebook_cells = []
+        st.write("### Data Preview")
+        st.write(df.head())
 
-        # Preprocessing section
-        st.header("Preprocessing")
+        # Drop columns functionality
         columns_to_drop = st.multiselect("Select columns to drop", df.columns.tolist())
         df, categorical_cols, numerical_cols = preprocess_data(df, notebook_cells, columns_to_drop)
 
-        # Univariate analysis section
-        st.header("Univariate Analysis")
+        # Run univariate analysis
         univariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
 
-        # Multivariate analysis section
-        st.header("Multivariate Analysis")
+        # Run multivariate analysis
         multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
 
-        # Export notebook button
-        if st.button("Export Notebook"):
-            try:
-                notebook_bytes = export_notebook_cells(notebook_cells)
-                print(type(notebook_bytes))  # Debugging: check the type of notebook_bytes
-                # Create a download button
-                st.download_button(
-                    label="Download Notebook",
-                    data=notebook_bytes,
-                    file_name="analysis_notebook.ipynb",
-                    mime="application/x-ipynb+json"  # Correct MIME type for Jupyter notebooks
-                )
-                st.success("Notebook ready for download!")
-            except Exception as e:
-                st.error(f"Error preparing notebook for download: {e}")
-                print(e)  # Print the error message
+        # Run statistical analysis
+        statistical_analysis(df, categorical_cols, numerical_cols, notebook_cells)
 
+        # Provide option to download the notebook
+        if st.button("Download Analysis Notebook"):
+            nb = nbformat.v4.new_notebook()
+            nb.cells = notebook_cells
+            notebook_file = io.BytesIO()
+            nbformat.write(nb, notebook_file)
+            notebook_file.seek(0)
+            st.download_button("Download", notebook_file, "analysis_notebook.ipynb")
 
+# Run the app
 if __name__ == "__main__":
     main()
