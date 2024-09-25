@@ -5,7 +5,7 @@ import scipy.stats as stats
 import time
 import numpy as np
 import streamlit as st
-from io import StringIO
+from io import StringIO, BytesIO
 from scipy.stats.mstats import winsorize
 import pandas as pd
 import os
@@ -19,7 +19,7 @@ def import_notebook(filepath):
 
 
 def preprocess_data(df, notebook_cells, columns_to_drop):
-    start_time = time.time()
+    start_time = time.time()  # Start timer
     initial_rows = len(df)
     removed_rows_all = removed_rows_na = 0
 
@@ -86,9 +86,10 @@ def preprocess_data(df, notebook_cells, columns_to_drop):
     except Exception as e:
         st.error(f"Error winsorizing data: {e}")
 
-    preprocess_time = time.time() - start_time
+    preprocess_time = time.time() - start_time  # End timer
     st.write(f"Preprocessing took {preprocess_time:.2f} seconds")
 
+    # Adding preprocessing steps to the notebook
     notebook_cells.append(nbformat.v4.new_markdown_cell("## Preprocessing Summary"))
     notebook_cells.append(nbformat.v4.new_code_cell(
         "initial_rows = len(df)\n"
@@ -114,6 +115,7 @@ def preprocess_data(df, notebook_cells, columns_to_drop):
         "    df[col] = winsorize(df[col], limits=[0.05, 0.05])"
     ))
 
+    # Summary logs
     notebook_cells.append(nbformat.v4.new_markdown_cell(f"- Removed {removed_rows_all} rows with all missing values."))
     notebook_cells.append(nbformat.v4.new_markdown_cell(f"- Removed {removed_rows_na} rows with missing values."))
     notebook_cells.append(nbformat.v4.new_markdown_cell(
@@ -125,6 +127,7 @@ def preprocess_data(df, notebook_cells, columns_to_drop):
     notebook_cells.append(nbformat.v4.new_markdown_cell(
         f"- Winsorized: {len(winsorized_rows)} rows, {len(numerical_cols)} cols using limits {winsorize_limits}."))
 
+    # Streamlit display logs
     st.write("**Preprocessing Summary**")
     st.markdown(f"- Removed {removed_rows_all} rows with all missing values.")
     st.markdown(f"- Removed {removed_rows_na} rows with missing values.")
@@ -137,6 +140,7 @@ def preprocess_data(df, notebook_cells, columns_to_drop):
     for summary in imputation_summary:
         st.markdown(summary)
 
+    # Display data information
     st.write("**Data Information**")
     buffer = StringIO()
     df.info(buf=buffer)
@@ -148,139 +152,200 @@ def preprocess_data(df, notebook_cells, columns_to_drop):
     return df, categorical_cols, numerical_cols
 
 
-# Function for univariate analysis
 def univariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
-    st.write("**Univariate Analysis**")
-
-    # Plot for numerical columns
-    for col in numerical_cols:
-        st.write(f"### Distribution of {col}")
-        fig, ax = plt.subplots()
-        sns.histplot(df[col], kde=True, ax=ax)
-        st.pyplot(fig)
-        notebook_cells.append(nbformat.v4.new_code_cell(f"sns.histplot(df['{col}'], kde=True)"))
-
-    # Plot for categorical columns
     for col in categorical_cols:
-        st.write(f"### Count plot of {col}")
-        fig, ax = plt.subplots()
-        sns.countplot(x=df[col], ax=ax)
+        st.header(f"Univariate Analysis: {col}")
+        st.bar_chart(df[col].value_counts())
+        st.markdown(f"**Mode:** {df[col].mode().values[0]}")
+        notebook_cells.append(
+            nbformat.v4.new_markdown_cell(f"### Univariate Analysis: {col}\n**Mode:** {df[col].mode().values[0]}\n"))
+        notebook_cells.append(nbformat.v4.new_code_cell(f"display(df['{col}'].value_counts().plot(kind='bar'))"))
+
+    for col in numerical_cols:
+        st.header(f"Univariate Analysis: {col}")
+        fig, ax = plt.subplots(1, 2, figsize=(12, 4))
+        sns.histplot(df[col].dropna(), bins=30, alpha=0.5, ax=ax[0], color='skyblue')
+        sns.boxplot(x=df[col].dropna(), ax=ax[1], color='lightgreen')
         st.pyplot(fig)
-        notebook_cells.append(nbformat.v4.new_code_cell(f"sns.countplot(x=df['{col}'])"))
+
+        summary_stats = df[col].describe().to_frame().T
+        st.table(summary_stats)
+        notebook_cells.append(nbformat.v4.new_markdown_cell(f"### Univariate Analysis: {col}\n**Summary Statistics:**"))
+        notebook_cells.append(nbformat.v4.new_code_cell("df['{}'].describe().to_frame().T".format(col)))
 
 
-# Function for multivariate analysis
 def multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
-    st.write("**Multivariate Analysis**")
+    # Categorical vs Categorical
+    for col1, col2 in zip(categorical_cols, categorical_cols[1:]):
+        st.header(f"Multivariate Analysis: {col1} vs. {col2}")
+        crosstab = pd.crosstab(df[col1], df[col2])
+        st.table(crosstab)
+        chi2, p, _, _ = stats.chi2_contingency(crosstab)
+        notebook_cells.append(nbformat.v4.new_markdown_cell(f"### Multivariate Analysis: {col1} vs. {col2}"))
+        notebook_cells.append(nbformat.v4.new_code_cell(f"display(pd.crosstab(df['{col1}'], df['{col2}']))"))
 
-    # Pairplot for numerical columns
-    if len(numerical_cols) > 1:
-        st.write("### Pairplot of numerical columns")
-        fig = sns.pairplot(df[numerical_cols])
-        st.pyplot(fig)
-        notebook_cells.append(nbformat.v4.new_code_cell("sns.pairplot(df[numerical_cols])"))
-
-    # Heatmap of correlations for numerical columns
-    st.write("### Correlation heatmap")
-    fig, ax = plt.subplots()
-    sns.heatmap(df[numerical_cols].corr(), annot=True, cmap='coolwarm', ax=ax)
+    # Numerical vs Numerical
+    st.header("Correlation Matrix")
+    corr_matrix = df[numerical_cols].corr()
+    st.dataframe(corr_matrix)
+    fig, ax = plt.subplots(figsize=(8, 6))
+    sns.heatmap(corr_matrix, annot=True, cmap="coolwarm", cbar=True, ax=ax, fmt='.2f', annot_kws={"size": 8})
     st.pyplot(fig)
-    notebook_cells.append(
-        nbformat.v4.new_code_cell("sns.heatmap(df[numerical_cols].corr(), annot=True, cmap='coolwarm')"))
+    notebook_cells.append(nbformat.v4.new_markdown_cell("### Correlation Matrix"))
+    notebook_cells.append(nbformat.v4.new_code_cell(
+        "sns.heatmap(df.corr(), annot=True, cmap='coolwarm', fmt='.2f', annot_kws={'size': 8});"))
+
+    corr_pairs = corr_matrix.unstack()
+    corr_pairs = corr_pairs[corr_pairs.index.get_level_values(0) != corr_pairs.index.get_level_values(1)]
+    corr_pairs = corr_pairs.reset_index()
+    corr_pairs.columns = ['Variable1', 'Variable2', 'Correlation']
+    corr_pairs = corr_pairs.sort_values(by='Correlation', ascending=False).reset_index(drop=True)
+
+    top_corr = corr_pairs.head(10)
+    st.header("Top 10 Correlation Coefficients")
+    st.table(top_corr)
+
+    bottom_corr = corr_pairs.tail(10).iloc[::-1]
+    st.header("Bottom 10 Correlation Coefficients (Reversed Order)")
+    st.table(bottom_corr)
+
+    notebook_cells.append(nbformat.v4.new_markdown_cell("### Correlation Coefficients Summary"))
+    notebook_cells.append(nbformat.v4.new_code_cell(
+        "corr_matrix = df.corr()\n"
+        "corr_pairs = corr_matrix.unstack()\n"
+        "corr_pairs = corr_pairs[corr_pairs.index.get_level_values(0) != corr_pairs.index.get_level_values(1)]\n"
+        "corr_pairs = corr_pairs.reset_index()\n"
+        "corr_pairs.columns = ['Variable1', 'Variable2', 'Correlation']\n"
+        "corr_pairs = corr_pairs.sort_values(by='Correlation', ascending=False).reset_index(drop=True)\n"
+        "display(corr_pairs.head(10))\n"
+        "display(corr_pairs.tail(10).iloc[::-1])"))
+
+    # Categorical vs Numerical
+    for col1 in categorical_cols:
+        for col2 in numerical_cols:
+            st.header(f"Multivariate Analysis: {col1} vs {col2}")
+            fig, ax = plt.subplots(figsize=(6, 4))
+            sns.boxplot(x=df[col1], y=df[col2], ax=ax, palette="Set2")
+            st.pyplot(fig)
+            f_stat, p_val = stats.f_oneway(*[df[col2][df[col1] == group] for group in df[col1].unique()])
+            notebook_cells.append(nbformat.v4.new_markdown_cell(f"### Multivariate Analysis: {col1} vs {col2}"))
+            notebook_cells.append(
+                nbformat.v4.new_code_cell(f"display(sns.boxplot(x=df['{col1}'], y=df['{col2}'], palette='Set2'));"))
 
 
-# Function for KMeans clustering
 def kmeans_clustering(df, numerical_cols, notebook_cells, n_clusters=3):
-    st.write(f"**KMeans Clustering with {n_clusters} Clusters**")
+    st.header("KMeans Clustering")
+    if len(numerical_cols) >= 2:
+        kmeans = KMeans(n_clusters=n_clusters)
+        df['kmeans_cluster'] = kmeans.fit_predict(df[numerical_cols].dropna())
 
-    # Run KMeans
-    kmeans = KMeans(n_clusters=n_clusters)
-    df['Cluster'] = kmeans.fit_predict(df[numerical_cols])
+        cluster_centers = pd.DataFrame(kmeans.cluster_centers_, columns=numerical_cols)
+        st.table(cluster_centers)
 
-    # Show cluster centers
-    st.write("Cluster Centers:")
-    st.write(pd.DataFrame(kmeans.cluster_centers_, columns=numerical_cols))
+        # Plot KMeans Clusters
+        for i in range(len(numerical_cols)):
+            for j in range(i + 1, len(numerical_cols)):
+                fig, ax = plt.subplots(figsize=(8, 6))
+                sns.scatterplot(data=df, x=numerical_cols[i], y=numerical_cols[j], hue='kmeans_cluster',
+                                palette='viridis', ax=ax)
+                ax.set_title(f'KMeans Clustering: {numerical_cols[i]} vs {numerical_cols[j]}')
+                st.pyplot(fig)
 
-    # Plot clusters
-    st.write("### Cluster Plot")
-    fig, ax = plt.subplots()
-    sns.scatterplot(x=df[numerical_cols[0]], y=df[numerical_cols[1]], hue='Cluster', data=df, palette="viridis", ax=ax)
-    st.pyplot(fig)
-    notebook_cells.append(nbformat.v4.new_code_cell(f"kmeans = KMeans(n_clusters={n_clusters})\n"
-                                                    f"df['Cluster'] = kmeans.fit_predict(df[numerical_cols])"))
+                notebook_cells.append(nbformat.v4.new_markdown_cell(
+                    f"### KMeans Clustering: {numerical_cols[i]} vs {numerical_cols[j]}"))
+                notebook_cells.append(nbformat.v4.new_code_cell(
+                    f"sns.scatterplot(data=df, x='{numerical_cols[i]}', y='{numerical_cols[j]}', hue='kmeans_cluster', palette='viridis');"
+                ))
 
-
-# Function for statistical testing
-def perform_statistical_testing(df, categorical_cols, numerical_cols, notebook_cells):
-    st.write("**Statistical Testing**")
-
-    # Example: ANOVA test for numerical vs categorical columns
-    for cat_col in categorical_cols:
-        for num_col in numerical_cols:
-            st.write(f"ANOVA test for {num_col} by {cat_col}")
-            groups = [group[num_col].values for name, group in df.groupby(cat_col)]
-            f_val, p_val = stats.f_oneway(*groups)
-            st.write(f"F-statistic: {f_val}, p-value: {p_val}")
-            notebook_cells.append(nbformat.v4.new_code_cell(
-                f"stats.f_oneway(*[group['{num_col}'].values for name, group in df.groupby('{cat_col}')])"))
+        notebook_cells.append(nbformat.v4.new_markdown_cell("### KMeans Clustering"))
+        notebook_cells.append(nbformat.v4.new_code_cell(
+            f"kmeans = KMeans(n_clusters={n_clusters})\ndf['kmeans_cluster'] = kmeans.fit_predict(df[{numerical_cols}].dropna())\npd.DataFrame(kmeans.cluster_centers_, columns={numerical_cols})"
+        ))
 
 
-# Main function to orchestrate the flow
+def statistical_testing(df, categorical_cols, numerical_cols, notebook_cells):
+    anova_results = []
+    ttest_results = []
+
+    # Categorical vs Numerical
+    for col1 in categorical_cols:
+        for col2 in numerical_cols:
+            # ANOVA Test
+            try:
+                f_stat, p_val = stats.f_oneway(*[df[col2][df[col1] == group].dropna() for group in df[col1].unique()])
+                anova_results.append(
+                    {"Variable1": col1, "Variable2": col2, "Test": "ANOVA", "Statistic": f_stat, "P-value": p_val})
+            except Exception as e:
+                st.error(f"ANOVA test failed for {col1} vs {col2}: {e}")
+
+            # T-Test (only for binary categorical variables)
+            if df[col1].nunique() == 2:
+                try:
+                    group1 = df[col2][df[col1] == df[col1].unique()[0]].dropna()
+                    group2 = df[col2][df[col1] == df[col1].unique()[1]].dropna()
+                    t_stat, p_val = stats.ttest_ind(group1, group2)
+                    ttest_results.append(
+                        {"Variable1": col1, "Variable2": col2, "Test": "T-test", "Statistic": t_stat, "P-value": p_val})
+                except Exception as e:
+                    st.error(f"T-test failed for {col1} vs {col2}: {e}")
+
+    # Numerical vs Numerical
+    for i, col1 in enumerate(numerical_cols):
+        for col2 in numerical_cols[i + 1:]:
+            # ANOVA Test
+            try:
+                f_stat, p_val = stats.f_oneway(df[col1].dropna(), df[col2].dropna())
+                anova_results.append(
+                    {"Variable1": col1, "Variable2": col2, "Test": "ANOVA", "Statistic": f_stat, "P-value": p_val})
+            except Exception as e:
+                st.error(f"ANOVA test failed for {col1} vs {col2}: {e}")
+
+            # T-Test
+            try:
+                t_stat, p_val = stats.ttest_ind(df[col1].dropna(), df[col2].dropna())
+                ttest_results.append(
+                    {"Variable1": col1, "Variable2": col2, "Test": "T-test", "Statistic": t_stat, "P-value": p_val})
+            except Exception as e:
+                st.error(f"T-test failed for {col1} vs {col2}: {e}")
+
+    # Display ANOVA Results
+    if anova_results:
+        anova_df = pd.DataFrame(anova_results)
+        st.header("ANOVA Results Summary")
+        st.dataframe(anova_df)
+        notebook_cells.append(nbformat.v4.new_markdown_cell("## ANOVA Results Summary"))
+        notebook_cells.append(nbformat.v4.new_code_cell("anova_df = pd.DataFrame(anova_results)\nanova_df"))
+
+    # Display T-Test Results
+    if ttest_results:
+        ttest_df = pd.DataFrame(ttest_results)
+        st.header("T-Test Results Summary")
+        st.dataframe(ttest_df)
+        notebook_cells.append(nbformat.v4.new_markdown_cell("## T-Test Results Summary"))
+        notebook_cells.append(nbformat.v4.new_code_cell("ttest_df = pd.DataFrame(ttest_results)\nttest_df"))
+
+
+def save_results(dataframe, file_path):
+    dataframe.to_csv(file_path, index=False)
+    st.success(f"Results saved to {file_path}")
+
+
 def main():
-    # Embed the updated banner image
-    banner_path = "EDA App Banner.png"  # Update to the correct path
-    st.image(banner_path, use_column_width=True)
+    st.title("Data Preprocessing and Analysis App")
 
-    # Update the title to "EDA App"
-    st.title("Exploratory Data Analysis App")
-    notebook_cells = []
+    uploaded_file = st.file_uploader("Upload a CSV file", type=["csv"])
 
-    uploaded_file = st.file_uploader("Upload your CSV file", type="csv")
     if uploaded_file is not None:
-        # Load data
         df = pd.read_csv(uploaded_file)
-        filename = uploaded_file.name  # Get the file name
-        st.success(f"File '{filename}' uploaded successfully.")
-        st.write("First five rows of the dataset:")
-        st.write(df.head())
-        notebook_cells.append(nbformat.v4.new_markdown_cell("## Initial Data Preview"))
-        notebook_cells.append(nbformat.v4.new_code_cell("df.head()"))
+        columns_to_drop = st.multiselect("Select columns to drop (if any)", df.columns.tolist())
 
-        # Add code to automatically load the dataset in the generated notebook
-        notebook_cells.insert(0, nbformat.v4.new_code_cell(f"import pandas as pd\ndf = pd.read_csv('{filename}')"))
+        st.write("Columns in the dataset:", df.columns.tolist())
 
-        # Select columns to drop
-        columns_to_drop = st.multiselect("Select columns to drop", df.columns)
+        # Notebook cells container
+        notebook_cells = []
 
-        # Preprocess data
+        # Preprocess the data
         df, categorical_cols, numerical_cols = preprocess_data(df, notebook_cells, columns_to_drop)
 
-        # Univariate analysis
-        if st.checkbox("Perform Univariate Analysis"):
-            univariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
-
-        # Multivariate analysis
-        if st.checkbox("Perform Multivariate Analysis"):
-            multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
-
-        # KMeans clustering
-        if st.checkbox("Perform KMeans Clustering"):
-            n_clusters = st.slider("Select number of clusters", 2, 10, 3)
-            kmeans_clustering(df, numerical_cols, notebook_cells, n_clusters=n_clusters)
-
-        # Statistical testing
-        if st.checkbox("Perform Statistical Testing"):
-            perform_statistical_testing(df, categorical_cols, numerical_cols, notebook_cells)
-
-        # Option to download notebook
-        if st.button("Download Notebook"):
-            notebook_content = nbformat.v4.new_notebook()
-            notebook_content['cells'] = notebook_cells
-            notebook_filename = "analysis_notebook.ipynb"
-            with open(notebook_filename, 'w', encoding='utf-8') as f:
-                nbformat.write(notebook_content, f)
-            st.success(f"Notebook saved as {notebook_filename}")
-
-
-if __name__ == "__main__":
-    main()
+        # Univariate Analysis
+        if
