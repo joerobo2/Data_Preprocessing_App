@@ -312,20 +312,20 @@ def main():
             statistical_analysis(df, numerical_cols, categorical_cols, notebook_cells)
 
        # Replace the save notebook functionality with download
-        if st.button("Export Notebook"):
-            try:
-                notebook_bytes = export_notebook_cells(notebook_cells)
-                # Create a download button
-                st.download_button(
-                    label="Download Notebook",
-                    data=notebook_bytes,
-                    file_name="analysis_notebook.ipynb",
-                    mime="application/ipynb"  # Specify the MIME type for Jupyter notebooks
-                )
-                st.success("Notebook ready for download!")
-            except Exception as e:
-                st.error(f"Error preparing notebook for download: {e}")
-                print(e)  # Print the error message
+       if st.button("Export Notebook"):
+        try:
+            notebook_bytes = export_notebook_cells(notebook_cells)
+            # Create a download button
+            st.download_button(
+                label="Download Notebook",
+                data=notebook_bytes,
+                file_name="analysis_notebook.ipynb",
+                mime="application/x-ipynb+json"  # Correct MIME type for Jupyter notebooks
+            )
+            st.success("Notebook ready for download!")
+        except Exception as e:
+            st.error(f"Error preparing notebook for download: {e}")
+            print(e)  # Print the error message
 
 if __name__ == "__main__":
     main()
