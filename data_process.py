@@ -11,12 +11,15 @@ import pandas as pd
 import os
 import nbformat
 
-
-def import_notebook(filepath):
-    if not os.path.exists(filepath):
-        raise FileNotFoundError(f"File not found: {filepath}")
-    return pd.read_csv(filepath)
-
+# Function to import CSV from BytesIO object.
+def import_notebook(uploaded_file):
+    """Read a CSV file from the uploaded file."""
+    try:
+        df = pd.read_csv(uploaded_file)
+        return df
+    except Exception as e:
+        st.error(f"Error reading the uploaded file: {e}")
+        return None
 
 def preprocess_data(df, notebook_cells, columns_to_drop):
     start_time = time.time()
@@ -116,18 +119,6 @@ def preprocess_data(df, notebook_cells, columns_to_drop):
 
     notebook_cells.append(nbformat.v4.new_markdown_cell(f"- Removed {removed_rows_all} rows with all missing values."))
     notebook_cells.append(nbformat.v4.new_markdown_cell(f"- Removed {removed_rows_na} rows with missing values."))
-    notebook_cells.append(nbformat.v4.new_markdown_cell(
-        f"- Imputed {imputed_numerical} missing numerical values." if imputed_numerical > 0 else "- No missing numerical values imputed."))
-    notebook_cells.append(nbformat.v4.new_markdown_cell(
-        f"- Imputed {imputed_categorical} missing categorical values." if imputed_categorical > 0 else "- No missing categorical values imputed."))
-    notebook_cells.append(nbformat.v4.new_markdown_cell(
-        f"- Removed {removed_duplicates} duplicate rows." if removed_duplicates > 0 else "- No duplicate rows removed."))
-    notebook_cells.append(nbformat.v4.new_markdown_cell(
-        f"- Winsorized: {len(winsorized_rows)} rows, {len(numerical_cols)} cols using limits {winsorize_limits}."))
-
-    st.write("**Preprocessing Summary**")
-    st.markdown(f"- Removed {removed_rows_all} rows with all missing values.")
-    st.markdown(f"- Removed {removed_rows_na} rows with missing values.")
     imputation_summary = [
         f"- Imputed {imputed_numerical} missing numerical values." if imputed_numerical > 0 else "- No missing numerical values imputed.",
         f"- Imputed {imputed_categorical} missing categorical values." if imputed_categorical > 0 else "- No missing categorical values imputed.",
@@ -146,7 +137,6 @@ def preprocess_data(df, notebook_cells, columns_to_drop):
     notebook_cells.append(nbformat.v4.new_code_cell("df.info()"))
 
     return df, categorical_cols, numerical_cols
-
 
 # Function for univariate analysis
 def univariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
@@ -247,8 +237,13 @@ def t_test(df, categorical_cols, numerical_cols):
         num_col = st.selectbox("Select numerical column for T-test", numerical_cols)
 
         if st.button("Run T-test"):
-            group1 = df[df[cat_col] == df[cat_col].unique()[0]][num_col]
-            group2 = df[df[cat_col] == df[cat_col].unique()[1]][num_col]
+            unique_values = df[cat_col].unique()
+            if len(unique_values) != 2:
+                st.error("T-test requires exactly two groups.")
+                return
+
+            group1 = df[df[cat_col] == unique_values[0]][num_col]
+            group2 = df[df[cat_col] == unique_values[1]][num_col]
 
             t_stat, p_val = stats.ttest_ind(group1, group2)
 
@@ -268,20 +263,21 @@ def main():
     uploaded_file = st.file_uploader("Upload your CSV file", type=['csv'])
     if uploaded_file:
         df = import_notebook(uploaded_file)
-        st.write("Data Preview")
-        st.dataframe(df.head())
+        if df is not None:  # Only proceed if df is successfully read
+            st.write("Data Preview")
+            st.dataframe(df.head())
 
-        columns_to_drop = st.multiselect("Select columns to drop", df.columns.tolist())
-        df, categorical_cols, numerical_cols = preprocess_data(df, notebook_cells, columns_to_drop)
+            columns_to_drop = st.multiselect("Select columns to drop", df.columns.tolist())
+            df, categorical_cols, numerical_cols = preprocess_data(df, notebook_cells, columns_to_drop)
 
-        univariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
-        bivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
-        multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
-        anova_test(df, categorical_cols, numerical_cols)
-        t_test(df, categorical_cols, numerical_cols)
+            univariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
+            bivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
+            multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
+            anova_test(df, categorical_cols, numerical_cols)
+            t_test(df, categorical_cols, numerical_cols)
 
-        with open("notebook_summary.ipynb", "w") as f:
-            nbformat.write(nbformat.v4.new_notebook(cells=notebook_cells), f)
+            with open("notebook_summary.ipynb", "w") as f:
+                nbformat.write(nbformat.v4.new_notebook(cells=notebook_cells), f)
 
 if __name__ == "__main__":
     main()
