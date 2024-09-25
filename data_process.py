@@ -169,113 +169,119 @@ def univariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
         notebook_cells.append(nbformat.v4.new_code_cell(f"sns.countplot(x=df['{col}'])"))
 
 
+# Function for bivariate analysis
+def bivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
+    st.write("**Bivariate Analysis**")
+
+    # Scatter plots for numerical vs numerical
+    if len(numerical_cols) > 1:
+        x_col = st.selectbox("Select X numerical column", numerical_cols)
+        y_col = st.selectbox("Select Y numerical column", numerical_cols)
+
+        st.write(f"### Scatter plot of {x_col} vs {y_col}")
+        fig, ax = plt.subplots()
+        sns.scatterplot(data=df, x=x_col, y=y_col)
+        st.pyplot(fig)
+        notebook_cells.append(nbformat.v4.new_code_cell(f"sns.scatterplot(data=df, x='{x_col}', y='{y_col}')"))
+
+    # Box plots for numerical vs categorical
+    if len(categorical_cols) > 0 and len(numerical_cols) > 0:
+        cat_col = st.selectbox("Select categorical column for box plot", categorical_cols)
+
+        st.write(f"### Box plot of {cat_col} vs numerical columns")
+        fig, ax = plt.subplots()
+        for num_col in numerical_cols:
+            sns.boxplot(data=df, x=cat_col, y=num_col, ax=ax)
+            st.pyplot(fig)
+            notebook_cells.append(nbformat.v4.new_code_cell(f"sns.boxplot(data=df, x='{cat_col}', y='{num_col}')"))
+
+
 # Function for multivariate analysis
 def multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
     st.write("**Multivariate Analysis**")
 
-    # Pairplot for numerical columns
     if len(numerical_cols) > 1:
-        st.write("### Pairplot of numerical columns")
-        fig = sns.pairplot(df[numerical_cols])
-        st.pyplot(fig)
-        notebook_cells.append(nbformat.v4.new_code_cell("sns.pairplot(df[numerical_cols])"))
+        target_col = st.selectbox("Select target numerical column", numerical_cols)
+        features = st.multiselect("Select feature numerical columns", numerical_cols)
+        if features:
+            X = df[features]
+            y = df[target_col]
 
-    # Heatmap of correlations for numerical columns
-    st.write("### Correlation heatmap")
-    fig, ax = plt.subplots()
-    sns.heatmap(df[numerical_cols].corr(), annot=True, cmap='coolwarm', ax=ax)
-    st.pyplot(fig)
-    notebook_cells.append(
-        nbformat.v4.new_code_cell("sns.heatmap(df[numerical_cols].corr(), annot=True, cmap='coolwarm')"))
+            # KMeans clustering
+            kmeans = KMeans(n_clusters=3, random_state=42)
+            kmeans.fit(X)
+            df['Cluster'] = kmeans.labels_
 
-
-# Function for clustering analysis
-def clustering_analysis(df, numerical_cols, notebook_cells):
-    st.write("**Clustering Analysis**")
-
-    # Selecting the number of clusters
-    k = st.slider("Select number of clusters (k)", min_value=1, max_value=10, value=3)
-
-    # KMeans clustering
-    kmeans = KMeans(n_clusters=k, random_state=0)
-    df['Cluster'] = kmeans.fit_predict(df[numerical_cols])
-    st.write(f"### KMeans Clustering Results (k={k})")
-    st.write(df[['Cluster'] + list(numerical_cols)].head())
-    notebook_cells.append(nbformat.v4.new_code_cell(f"kmeans = KMeans(n_clusters={k})\n"
-                                                      "df['Cluster'] = kmeans.fit_predict(df[numerical_cols])"))
+            st.write(f"### KMeans Clustering on {target_col} with features {features}")
+            fig, ax = plt.subplots()
+            sns.scatterplot(x=df[features[0]], y=df[features[1]], hue=df['Cluster'], palette='viridis')
+            st.pyplot(fig)
+            notebook_cells.append(nbformat.v4.new_code_cell(f"sns.scatterplot(x=df['{features[0]}'], y=df['{features[1]}'], hue=df['Cluster'], palette='viridis')"))
 
 
-# Function to run statistical tests
-def statistical_tests(df, numerical_cols, notebook_cells):
-    st.write("**Statistical Tests**")
-    
-    test_options = ['T-test', 'ANOVA', 'Chi-squared']
-    test_choice = st.selectbox("Select statistical test", test_options)
+# Function for ANOVA test
+def anova_test(df, categorical_cols, numerical_cols):
+    st.write("**ANOVA Test**")
 
-    if test_choice == 'T-test':
-        col1 = st.selectbox("Select first numerical column", numerical_cols)
-        col2 = st.selectbox("Select second numerical column", numerical_cols)
+    if len(categorical_cols) > 0 and len(numerical_cols) > 0:
+        cat_col = st.selectbox("Select categorical column for ANOVA", categorical_cols)
+        num_col = st.selectbox("Select numerical column for ANOVA", numerical_cols)
 
-        stat, p = stats.ttest_ind(df[col1], df[col2], nan_policy='omit')
-        st.write(f"T-test results: statistic={stat}, p-value={p}")
-        notebook_cells.append(nbformat.v4.new_code_cell(f"stat, p = stats.ttest_ind(df['{col1}'], df['{col2}'], nan_policy='omit')"))
+        if st.button("Run ANOVA"):
+            groups = [group[num_col].values for name, group in df.groupby(cat_col)]
+            f_stat, p_val = stats.f_oneway(*groups)
 
-    elif test_choice == 'ANOVA':
-        col1 = st.selectbox("Select numerical column", numerical_cols)
-        col2 = st.selectbox("Select categorical column", categorical_cols)
-
-        model = stats.f_oneway(*(df[df[col2] == group][col1] for group in df[col2].unique()))
-        st.write(f"ANOVA results: F-statistic={model.statistic}, p-value={model.pvalue}")
-        notebook_cells.append(nbformat.v4.new_code_cell(f"model = stats.f_oneway(*(df[df['{col2}] == group][{col1}] for group in df['{col2}'].unique()))"))
-
-    elif test_choice == 'Chi-squared':
-        col1 = st.selectbox("Select first categorical column", categorical_cols)
-        col2 = st.selectbox("Select second categorical column", categorical_cols)
-
-        contingency_table = pd.crosstab(df[col1], df[col2])
-        stat, p, dof, expected = stats.chi2_contingency(contingency_table)
-        st.write(f"Chi-squared test results: statistic={stat}, p-value={p}")
-        notebook_cells.append(nbformat.v4.new_code_cell(f"contingency_table = pd.crosstab(df['{col1}'], df['{col2}'])\n"
-                                                         "stat, p, dof, expected = stats.chi2_contingency(contingency_table)"))
+            st.write(f"F-statistic: {f_stat:.4f}, p-value: {p_val:.4f}")
+            if p_val < 0.05:
+                st.success("Reject the null hypothesis: at least one group mean is different.")
+            else:
+                st.warning("Fail to reject the null hypothesis: no significant difference in means.")
 
 
-# Main function for the Streamlit app
+# Function for T-tests
+def t_test(df, categorical_cols, numerical_cols):
+    st.write("**T-Test**")
+
+    if len(categorical_cols) > 0 and len(numerical_cols) > 0:
+        cat_col = st.selectbox("Select categorical column for T-test", categorical_cols)
+        num_col = st.selectbox("Select numerical column for T-test", numerical_cols)
+
+        if st.button("Run T-test"):
+            group1 = df[df[cat_col] == df[cat_col].unique()[0]][num_col]
+            group2 = df[df[cat_col] == df[cat_col].unique()[1]][num_col]
+
+            t_stat, p_val = stats.ttest_ind(group1, group2)
+
+            st.write(f"T-statistic: {t_stat:.4f}, p-value: {p_val:.4f}")
+            if p_val < 0.05:
+                st.success("Reject the null hypothesis: means are significantly different.")
+            else:
+                st.warning("Fail to reject the null hypothesis: no significant difference in means.")
+
+
+# Streamlit App
 def main():
-    st.title("Exploratory Data Analysis App")
+    st.title("Exploratory Data Analysis (EDA) App")
 
-    # Select CSV file
-    uploaded_file = st.file_uploader("Choose a CSV file", type='csv')
-    if uploaded_file is not None:
-        df = pd.read_csv(uploaded_file)
+    notebook_cells = []
+
+    uploaded_file = st.file_uploader("Upload your CSV file", type=['csv'])
+    if uploaded_file:
+        df = import_notebook(uploaded_file)
         st.write("Data Preview")
-        st.write(df.head())
+        st.dataframe(df.head())
 
-        # Initialize notebook cells
-        notebook_cells = []
+        columns_to_drop = st.multiselect("Select columns to drop", df.columns.tolist())
+        df, categorical_cols, numerical_cols = preprocess_data(df, notebook_cells, columns_to_drop)
 
-        # Preprocess Data
-        df, categorical_cols, numerical_cols = preprocess_data(df, notebook_cells, columns_to_drop=[])
-
-        # Univariate Analysis
         univariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
-
-        # Multivariate Analysis
+        bivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
         multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
+        anova_test(df, categorical_cols, numerical_cols)
+        t_test(df, categorical_cols, numerical_cols)
 
-        # Clustering Analysis
-        clustering_analysis(df, numerical_cols, notebook_cells)
-
-        # Statistical Tests
-        statistical_tests(df, numerical_cols, notebook_cells)
-
-        # Save notebook cells to a .ipynb file
-        with open("EDA_Notebook.ipynb", "w") as f:
-            nb = nbformat.v4.new_notebook()
-            nb.cells = notebook_cells
-            nbformat.write(nb, f)
-
-        st.success("Notebook saved as EDA_Notebook.ipynb")
-
+        with open("notebook_summary.ipynb", "w") as f:
+            nbformat.write(nbformat.v4.new_notebook(cells=notebook_cells), f)
 
 if __name__ == "__main__":
     main()
