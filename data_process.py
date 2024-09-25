@@ -142,49 +142,54 @@ def preprocess_data(df, notebook_cells, columns_to_drop):
 def univariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
     st.write("**Univariate Analysis**")
 
-    # Plot for numerical columns
-    for col in numerical_cols:
-        st.write(f"### Distribution of {col}")
-        fig, ax = plt.subplots()
-        sns.histplot(df[col], kde=True, ax=ax)
-        st.pyplot(fig)
-        notebook_cells.append(nbformat.v4.new_code_cell(f"sns.histplot(df['{col}'], kde=True)"))
+    # Add a Run button to execute univariate analysis
+    if st.button("Run Univariate Analysis"):
+        # Plot for numerical columns
+        for col in numerical_cols:
+            st.write(f"### Distribution of {col}")
+            fig, ax = plt.subplots()
+            sns.histplot(df[col], kde=True, ax=ax)
+            st.pyplot(fig)
+            notebook_cells.append(nbformat.v4.new_code_cell(f"sns.histplot(df['{col}'], kde=True)"))
 
-    # Plot for categorical columns
-    for col in categorical_cols:
-        st.write(f"### Count plot of {col}")
-        fig, ax = plt.subplots()
-        sns.countplot(x=df[col], ax=ax)
-        st.pyplot(fig)
-        notebook_cells.append(nbformat.v4.new_code_cell(f"sns.countplot(x=df['{col}'])"))
-
+        # Plot for categorical columns
+        for col in categorical_cols:
+            st.write(f"### Count plot of {col}")
+            fig, ax = plt.subplots()
+            sns.countplot(x=df[col], ax=ax)
+            ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='center')  # Center and rotate x-axis labels
+            st.pyplot(fig)
+            notebook_cells.append(nbformat.v4.new_code_cell(f"sns.countplot(x=df['{col}'])"))
 
 # Function for bivariate analysis
 def bivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
     st.write("**Bivariate Analysis**")
 
-    # Scatter plots for numerical vs numerical
-    if len(numerical_cols) > 1:
-        x_col = st.selectbox("Select X numerical column", numerical_cols)
-        y_col = st.selectbox("Select Y numerical column", numerical_cols)
+    # Check if there are enough numerical columns for analysis
+    if len(numerical_cols) > 1 and len(categorical_cols) > 0:
+        # Add a Run button to execute bivariate analysis
+        if st.button("Run Bivariate Analysis"):
+            # Scatter plots for numerical vs numerical
+            x_col = st.selectbox("Select X numerical column", numerical_cols)
+            y_col = st.selectbox("Select Y numerical column", numerical_cols)
 
-        st.write(f"### Scatter plot of {x_col} vs {y_col}")
-        fig, ax = plt.subplots()
-        sns.scatterplot(data=df, x=x_col, y=y_col)
-        st.pyplot(fig)
-        notebook_cells.append(nbformat.v4.new_code_cell(f"sns.scatterplot(data=df, x='{x_col}', y='{y_col}')"))
-
-    # Box plots for numerical vs categorical
-    if len(categorical_cols) > 0 and len(numerical_cols) > 0:
-        cat_col = st.selectbox("Select categorical column for box plot", categorical_cols)
-
-        st.write(f"### Box plot of {cat_col} vs numerical columns")
-        fig, ax = plt.subplots()
-        for num_col in numerical_cols:
-            sns.boxplot(data=df, x=cat_col, y=num_col, ax=ax)
+            st.write(f"### Scatter plot of {x_col} vs {y_col}")
+            fig, ax = plt.subplots()
+            sns.scatterplot(data=df, x=x_col, y=y_col)
             st.pyplot(fig)
-            notebook_cells.append(nbformat.v4.new_code_cell(f"sns.boxplot(data=df, x='{cat_col}', y='{num_col}')"))
+            notebook_cells.append(nbformat.v4.new_code_cell(f"sns.scatterplot(data=df, x='{x_col}', y='{y_col}')"))
 
+            # Box plots for numerical vs categorical
+            cat_col = st.selectbox("Select categorical column for box plot", categorical_cols)
+
+            st.write(f"### Box plot of {cat_col} vs numerical columns")
+            for num_col in numerical_cols:
+                fig, ax = plt.subplots()
+                sns.boxplot(data=df, x=cat_col, y=num_col, ax=ax)
+                st.pyplot(fig)
+                notebook_cells.append(nbformat.v4.new_code_cell(f"sns.boxplot(data=df, x='{cat_col}', y='{num_col}')"))
+    else:
+        st.warning("Not enough numerical or categorical columns for bivariate analysis.")
 
 # Function for multivariate analysis
 def multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
@@ -192,38 +197,41 @@ def multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
 
     # Check if there are enough numerical columns for analysis
     if len(numerical_cols) > 1:
-        st.write("### Pairplot of numerical columns")
+        # Add a Run button to execute multivariate analysis
+        if st.button("Run Multivariate Analysis"):
+            # Pairplot of numerical columns
+            st.write("### Pairplot of numerical columns")
+            pairplot_fig = sns.pairplot(df[numerical_cols])
+            st.pyplot(pairplot_fig)
+            notebook_cells.append(nbformat.v4.new_code_cell("sns.pairplot(df[numerical_cols])"))
+
+            # Create a subplot for the correlation heatmap
+            st.write("### Correlation Heatmap")
+            fig, ax = plt.subplots(figsize=(12, 10))  # Adjusted figure size for better visibility
+
+            # Heatmap of correlations for numerical columns
+            correlation_matrix = df[numerical_cols].corr()
+            sns.heatmap(correlation_matrix, annot=True, fmt=".2f", cmap='coolwarm', 
+                        ax=ax, square=True, cbar_kws={"shrink": .8}, 
+                        annot_kws={"size": 10}, linewidths=.5)  # Added annotation size and linewidths
+
+            ax.set_title('Correlation Heatmap', fontsize=16)  # Increased title font size
+            ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right', fontsize=12)  # Adjusted x-axis labels
+            ax.set_yticklabels(ax.get_yticklabels(), rotation=0, fontsize=12)  # Adjusted y-axis labels
+            
+            st.pyplot(fig)
+            notebook_cells.append(
+                nbformat.v4.new_code_cell("fig, ax = plt.subplots(figsize=(12, 10))\n"
+                                           "correlation_matrix = df[numerical_cols].corr()\n"
+                                           "sns.heatmap(correlation_matrix, annot=True, fmt='.2f', cmap='coolwarm', "
+                                           "ax=ax, square=True, cbar_kws={'shrink': .8}, "
+                                           "annot_kws={'size': 10}, linewidths=.5)\n"
+                                           "ax.set_title('Correlation Heatmap', fontsize=16)\n"
+                                           "ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right', fontsize=12)\n"
+                                           "ax.set_yticklabels(ax.get_yticklabels(), rotation=0, fontsize=12)"))
+    else:
+        st.warning("Not enough numerical columns for multivariate analysis.")
         
-        # Create a pairplot
-        pairplot_fig = sns.pairplot(df[numerical_cols])
-        st.pyplot(pairplot_fig)
-        notebook_cells.append(nbformat.v4.new_code_cell("sns.pairplot(df[numerical_cols])"))
-
-    # Create a subplot for the correlation heatmap
-    st.write("### Correlation Heatmap")
-    fig, ax = plt.subplots(figsize=(12, 10))  # Adjusted figure size for better visibility
-    
-    # Heatmap of correlations for numerical columns
-    correlation_matrix = df[numerical_cols].corr()
-    sns.heatmap(correlation_matrix, annot=True, fmt=".2f", cmap='coolwarm', 
-                ax=ax, square=True, cbar_kws={"shrink": .8}, 
-                annot_kws={"size": 10}, linewidths=.5)  # Added annotation size and linewidths
-
-    ax.set_title('Correlation Heatmap', fontsize=16)  # Increased title font size
-    ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right', fontsize=12)  # Adjusted x-axis labels
-    ax.set_yticklabels(ax.get_yticklabels(), rotation=0, fontsize=12)  # Adjusted y-axis labels
-    
-    st.pyplot(fig)
-    notebook_cells.append(
-        nbformat.v4.new_code_cell("fig, ax = plt.subplots(figsize=(12, 10))\n"
-                                   "correlation_matrix = df[numerical_cols].corr()\n"
-                                   "sns.heatmap(correlation_matrix, annot=True, fmt='.2f', cmap='coolwarm', "
-                                   "ax=ax, square=True, cbar_kws={'shrink': .8}, "
-                                   "annot_kws={'size': 10}, linewidths=.5)\n"
-                                   "ax.set_title('Correlation Heatmap', fontsize=16)\n"
-                                   "ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right', fontsize=12)\n"
-                                   "ax.set_yticklabels(ax.get_yticklabels(), rotation=0, fontsize=12)"))
-
 # Function for clustering analysis with elbow method
 def clustering_analysis(df, numerical_cols, notebook_cells):
     st.write("**Clustering Analysis**")
@@ -273,13 +281,13 @@ def clustering_analysis(df, numerical_cols, notebook_cells):
                                                     "ax2.set_ylabel(numerical_cols[1])"))
 
 
-# Function for ANOVA test across all numerical columns
-def anova_test(df, categorical_cols, numerical_cols):
-    st.write("**ANOVA Test Summary**")
+# Function for ANOVA across all numerical columns
+def anova(df, categorical_cols, numerical_cols):
+    st.write("**ANOVA Summary**")
 
     if len(categorical_cols) > 0 and len(numerical_cols) > 0:
         cat_col = st.selectbox("Select categorical column for ANOVA", categorical_cols)
-        
+
         # Initialize a summary table
         summary_data = {
             "Numerical Column": [],
@@ -288,19 +296,26 @@ def anova_test(df, categorical_cols, numerical_cols):
             "Significance": []
         }
 
-        for num_col in numerical_cols:
-            groups = [group[num_col].values for name, group in df.groupby(cat_col)]
-            f_stat, p_val = stats.f_oneway(*groups)
-            
-            summary_data["Numerical Column"].append(num_col)
-            summary_data["F-statistic"].append(f_stat)
-            summary_data["p-value"].append(p_val)
-            summary_data["Significance"].append("Reject H0" if p_val < 0.05 else "Fail to Reject H0")
+        # Add a Run button to execute the ANOVA
+        if st.button("Run ANOVA"):
+            # Ensure the categorical column has more than two groups for ANOVA
+            if df[cat_col].nunique() > 1:
+                groups = [df[df[cat_col] == group][numerical_cols].dropna() for group in df[cat_col].unique()]
 
-        # Create a DataFrame from the summary data
-        summary_df = pd.DataFrame(summary_data)
+                for num_col in numerical_cols:
+                    f_stat, p_val = stats.f_oneway(*[group[num_col] for group in groups if num_col in group.columns])
+                    
+                    summary_data["Numerical Column"].append(num_col)
+                    summary_data["F-statistic"].append(f_stat)
+                    summary_data["p-value"].append(p_val)
+                    summary_data["Significance"].append("Reject H0" if p_val < 0.05 else "Fail to Reject H0")
 
-        st.write(summary_df)
+                # Create a DataFrame from the summary data
+                summary_df = pd.DataFrame(summary_data)
+
+                st.write(summary_df)
+            else:
+                st.warning("ANOVA requires more than one group in the selected categorical column.")
 
 
 # Function for T-test across all numerical columns
@@ -309,7 +324,7 @@ def t_test(df, categorical_cols, numerical_cols):
 
     if len(categorical_cols) > 0 and len(numerical_cols) > 0:
         cat_col = st.selectbox("Select categorical column for T-tests", categorical_cols)
-        
+
         # Initialize a summary table
         summary_data = {
             "Numerical Column": [],
@@ -318,51 +333,69 @@ def t_test(df, categorical_cols, numerical_cols):
             "Significance": []
         }
 
-        # Ensure the categorical column has exactly two groups for T-test
-        if df[cat_col].nunique() == 2:
-            for num_col in numerical_cols:
-                group1 = df[df[cat_col] == df[cat_col].unique()[0]][num_col]
-                group2 = df[df[cat_col] == df[cat_col].unique()[1]][num_col]
-                
-                t_stat, p_val = stats.ttest_ind(group1, group2, nan_policy='omit')
+        # Add a Run button to execute the T-test
+        if st.button("Run T-test"):
+            # Ensure the categorical column has exactly two groups for T-test
+            if df[cat_col].nunique() == 2:
+                for num_col in numerical_cols:
+                    group1 = df[df[cat_col] == df[cat_col].unique()[0]][num_col]
+                    group2 = df[df[cat_col] == df[cat_col].unique()[1]][num_col]
+                    
+                    t_stat, p_val = stats.ttest_ind(group1, group2, nan_policy='omit')
 
-                summary_data["Numerical Column"].append(num_col)
-                summary_data["T-statistic"].append(t_stat)
-                summary_data["p-value"].append(p_val)
-                summary_data["Significance"].append("Reject H0" if p_val < 0.05 else "Fail to Reject H0")
+                    summary_data["Numerical Column"].append(num_col)
+                    summary_data["T-statistic"].append(t_stat)
+                    summary_data["p-value"].append(p_val)
+                    summary_data["Significance"].append("Reject H0" if p_val < 0.05 else "Fail to Reject H0")
 
-            # Create a DataFrame from the summary data
-            summary_df = pd.DataFrame(summary_data)
+                # Create a DataFrame from the summary data
+                summary_df = pd.DataFrame(summary_data)
 
-            st.write(summary_df)
-        else:
-            st.warning("T-test requires exactly two groups in the selected categorical column.")
-
+                st.write(summary_df)
+            else:
+                st.warning("T-test requires exactly two groups in the selected categorical column.")
 
 # Streamlit App
+# Main function for the Streamlit app
 def main():
-    st.title("Exploratory Data Analysis (EDA) App")
+    st.title("Exploratory Data Analysis App")
 
-    notebook_cells = []
+    # Select CSV file
+    uploaded_file = st.file_uploader("Choose a CSV file", type='csv')
+    if uploaded_file is not None:
+        df = pd.read_csv(uploaded_file)
+        st.write("Data Preview")
+        st.write(df.head())
 
-    uploaded_file = st.file_uploader("Upload your CSV file", type=['csv'])
-    if uploaded_file:
-        df = import_notebook(uploaded_file)
-        if df is not None:  # Only proceed if df is successfully read
-            st.write("Data Preview")
-            st.dataframe(df.head())
+        # Initialize notebook cells
+        notebook_cells = []
 
-            columns_to_drop = st.multiselect("Select columns to drop", df.columns.tolist())
-            df, categorical_cols, numerical_cols = preprocess_data(df, notebook_cells, columns_to_drop)
+        # Preprocess Data
+        df, categorical_cols, numerical_cols = preprocess_data(df, notebook_cells, columns_to_drop=[])
 
-            univariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
-            bivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
-            multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
-            anova_test(df, categorical_cols, numerical_cols)
-            t_test(df, categorical_cols, numerical_cols)
+        # Univariate Analysis
+        univariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
 
-            with open("notebook_summary.ipynb", "w") as f:
-                nbformat.write(nbformat.v4.new_notebook(cells=notebook_cells), f)
+        # Multivariate Analysis
+        multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
+
+        # Bivariate Analysis
+        bivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
+
+        # Clustering Analysis
+        clustering_analysis(df, numerical_cols, notebook_cells)
+
+        # Statistical Tests
+        anova(df, categorical_cols, numerical_cols)
+        t_test(df, categorical_cols, numerical_cols)
+
+        # Save notebook cells to a .ipynb file
+        with open("EDA_Notebook.ipynb", "w") as f:
+            nb = nbformat.v4.new_notebook()
+            nb.cells = notebook_cells
+            nbformat.write(nb, f)
+
+        st.success("Notebook saved as EDA_Notebook.ipynb")
 
 if __name__ == "__main__":
     main()
