@@ -236,49 +236,55 @@ def multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
 def clustering_analysis(df, numerical_cols, notebook_cells):
     st.write("**Clustering Analysis**")
 
-    # Selecting the number of clusters for KMeans
+    # Selecting the maximum number of clusters for KMeans
     max_k = st.slider("Select maximum number of clusters (k)", min_value=1, max_value=10, value=3)
 
-    # Elbow method to find the optimal number of clusters
-    inertia = []
-    for k in range(1, max_k + 1):
+    # Add a Run button to execute clustering analysis
+    if st.button("Run Clustering Analysis"):
+        # Elbow method to find the optimal number of clusters
+        inertia = []
+        for k in range(1, max_k + 1):
+            kmeans = KMeans(n_clusters=k, random_state=0)
+            kmeans.fit(df[numerical_cols])
+            inertia.append(kmeans.inertia_)
+
+        # Create subplots for elbow chart and cluster scatter plot
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+
+        # Elbow Chart
+        ax1.plot(range(1, max_k + 1), inertia, marker='o')
+        ax1.set_title('Elbow Method for Optimal k')
+        ax1.set_xlabel('Number of clusters (k)')
+        ax1.set_ylabel('Inertia')
+
+        # KMeans clustering and scatter plot
+        k = st.slider("Select number of clusters for KMeans", min_value=1, max_value=max_k, value=3)
         kmeans = KMeans(n_clusters=k, random_state=0)
-        kmeans.fit(df[numerical_cols])
-        inertia.append(kmeans.inertia_)
+        df['Cluster'] = kmeans.fit_predict(df[numerical_cols])
 
-    # Create subplots for elbow chart and cluster scatter plot
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+        ax2.scatter(df[numerical_cols[0]], df[numerical_cols[1]], c=df['Cluster'], cmap='viridis', marker='o', edgecolor='k')
+        ax2.set_title(f'KMeans Clustering Results (k={k})')
+        ax2.set_xlabel(numerical_cols[0])
+        ax2.set_ylabel(numerical_cols[1])
 
-    # Elbow Chart
-    ax1.plot(range(1, max_k + 1), inertia, marker='o')
-    ax1.set_title('Elbow Method for Optimal k')
-    ax1.set_xlabel('Number of clusters (k)')
-    ax1.set_ylabel('Inertia')
-
-    # KMeans clustering and scatter plot
-    k = st.slider("Select number of clusters for KMeans", min_value=1, max_value=max_k, value=3)
-    kmeans = KMeans(n_clusters=k, random_state=0)
-    df['Cluster'] = kmeans.fit_predict(df[numerical_cols])
-
-    ax2.scatter(df[numerical_cols[0]], df[numerical_cols[1]], c=df['Cluster'], cmap='viridis', marker='o', edgecolor='k')
-    ax2.set_title(f'KMeans Clustering Results (k={k})')
-    ax2.set_xlabel(numerical_cols[0])
-    ax2.set_ylabel(numerical_cols[1])
-
-    st.pyplot(fig)
-    notebook_cells.append(nbformat.v4.new_code_cell(f"for k in range(1, {max_k + 1}):\n"
-                                                    f"    kmeans = KMeans(n_clusters=k)\n"
-                                                    f"    kmeans.fit(df[numerical_cols])\n"
-                                                    f"    inertia.append(kmeans.inertia_)\n"
-                                                    "fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))\n"
-                                                    "ax1.plot(range(1, max_k + 1), inertia, marker='o')\n"
-                                                    "ax1.set_title('Elbow Method for Optimal k')\n"
-                                                    "ax1.set_xlabel('Number of clusters (k)')\n"
-                                                    "ax1.set_ylabel('Inertia')\n"
-                                                    "ax2.scatter(df[numerical_cols[0]], df[numerical_cols[1]], c=df['Cluster'], cmap='viridis', marker='o', edgecolor='k')\n"
-                                                    "ax2.set_title(f'KMeans Clustering Results (k={k})')\n"
-                                                    "ax2.set_xlabel(numerical_cols[0])\n"
-                                                    "ax2.set_ylabel(numerical_cols[1])"))
+        st.pyplot(fig)
+        
+        # Append notebook cell for clustering analysis
+        notebook_cells.append(nbformat.v4.new_code_cell(
+            f"for k in range(1, {max_k + 1}):\n"
+            f"    kmeans = KMeans(n_clusters=k)\n"
+            f"    kmeans.fit(df[numerical_cols])\n"
+            f"    inertia.append(kmeans.inertia_)\n"
+            "fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))\n"
+            "ax1.plot(range(1, max_k + 1), inertia, marker='o')\n"
+            "ax1.set_title('Elbow Method for Optimal k')\n"
+            "ax1.set_xlabel('Number of clusters (k)')\n"
+            "ax1.set_ylabel('Inertia')\n"
+            "ax2.scatter(df[numerical_cols[0]], df[numerical_cols[1]], c=df['Cluster'], cmap='viridis', marker='o', edgecolor='k')\n"
+            "ax2.set_title(f'KMeans Clustering Results (k={k})')\n"
+            "ax2.set_xlabel(numerical_cols[0])\n"
+            "ax2.set_ylabel(numerical_cols[1])"
+        ))
 
 
 # Function for ANOVA across all numerical columns
@@ -381,14 +387,15 @@ def main():
         # Univariate Analysis
         univariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
 
-        # Multivariate Analysis
-        multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
-
         # Bivariate Analysis
         bivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
 
-        # Clustering Analysis
-        clustering_analysis(df, numerical_cols, notebook_cells)
+        # Multivariate Analysis
+        multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
+
+        # Add a button to run clustering analysis
+        if st.button("Run Clustering Analysis"):
+            clustering_analysis(df, numerical_cols, notebook_cells)
 
         # Statistical Tests
         anova(df, categorical_cols, numerical_cols)
@@ -404,3 +411,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
