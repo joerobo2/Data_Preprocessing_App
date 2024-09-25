@@ -6,9 +6,9 @@ import plotly.express as px
 import plotly.graph_objects as go
 from sklearn.cluster import KMeans
 from scipy import stats
-from io import StringIO
+from io import StringIO, BytesIO
 import nbformat
-from io import BytesIO
+
 
 # Function to import CSV from BytesIO object.
 def import_notebook(uploaded_file):
@@ -20,7 +20,9 @@ def import_notebook(uploaded_file):
         return None
     return df
 
-def preprocess_data(df, notebook_cells, columns_to_drop, drop_na_all, drop_na_any, impute_numerical, impute_categorical, remove_duplicates, convert_to_category, winsorize_data):
+
+def preprocess_data(df, notebook_cells, columns_to_drop, drop_na_all, drop_na_any, impute_numerical, impute_categorical,
+                    remove_duplicates, convert_to_category, winsorize_data):
     start_time = time.time()
     initial_rows = len(df)
     removed_rows_all = removed_rows_na = 0
@@ -129,8 +131,10 @@ def preprocess_data(df, notebook_cells, columns_to_drop, drop_na_all, drop_na_an
         "    df[col] = winsorize(df[col], limits=[0.05, 0.05])"
     ))
 
-    notebook_cells.append(nbformat.v4.new_markdown_cell(f"- Removed {removed_rows_all} rows with all missing values." if drop_na_all else "- Did not remove rows with all missing values."))
-    notebook_cells.append(nbformat.v4.new_markdown_cell(f"- Removed {removed_rows_na} rows with missing values." if drop_na_any else "- Did not remove rows with any missing values."))
+    notebook_cells.append(nbformat.v4.new_markdown_cell(
+        f"- Removed {removed_rows_all} rows with all missing values." if drop_na_all else "- Did not remove rows with all missing values."))
+    notebook_cells.append(nbformat.v4.new_markdown_cell(
+        f"- Removed {removed_rows_na} rows with missing values." if drop_na_any else "- Did not remove rows with any missing values."))
     imputation_summary = [
         f"- Imputed {imputed_numerical} missing numerical values." if imputed_numerical > 0 else "- No missing numerical values imputed.",
         f"- Imputed {imputed_categorical} missing categorical values." if imputed_categorical > 0 else "- No missing categorical values imputed.",
@@ -200,18 +204,18 @@ def multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
 
 def clustering_analysis(df, numerical_cols, notebook_cells):
     st.write("### Clustering Analysis")
-    
+
     # KMeans Clustering
     num_clusters = st.slider("Select number of clusters for KMeans", min_value=1, max_value=10, value=3)
     kmeans = KMeans(n_clusters=num_clusters)
-    
+
     # Fitting the model
     kmeans.fit(df[numerical_cols])
-    
+
     # Adding cluster column to the dataframe
     df['Cluster'] = kmeans.labels_
     st.success(f"Clustered data into {num_clusters} clusters.")
-    
+
     # Plotting the clusters
     st.write("### Cluster Visualization")
     fig = px.scatter(df, x=numerical_cols[0], y=numerical_cols[1], color='Cluster', title='Cluster Visualization')
@@ -228,36 +232,39 @@ kmeans.fit(df[{', '.join(repr(col) for col in numerical_cols)}])
 df['Cluster'] = kmeans.labels_
 """))
 
+
 def create_notebook(notebook_cells):
     """Creates a Jupyter Notebook from cells."""
     nb = nbformat.v4.new_notebook()  # Create a new notebook
     nb.cells = notebook_cells  # Add cells to the notebook
     return nb
 
+
 def save_notebook(notebook):
     """Saves the Jupyter notebook to BytesIO and returns the bytes."""
     buffer = BytesIO()
-    
-    # Write the notebook to the buffer as JSON string, then encode to bytes
-    nbformat.write(notebook, buffer)
-    
+
+    # Write the notebook to the buffer.
+    nbformat.write(notebook, buffer, version=4)
+
     buffer.seek(0)  # Reset the buffer position to the beginning
     return buffer.getvalue()  # Return the byte content of the buffer
+
 
 def main():
     st.title("Data Preprocessing and Analysis App")
     uploaded_file = st.file_uploader("Upload your CSV file", type=["csv"])
-    
+
     if uploaded_file is not None:
         df = import_notebook(uploaded_file)
-        
+
         if df is not None:
             notebook_cells = []
             st.write("### Initial Data Preview")
             st.write(df.head())
             notebook_cells.append(nbformat.v4.new_markdown_cell("## Initial Data Preview"))
             notebook_cells.append(nbformat.v4.new_code_cell("df.head()"))
-            
+
             # Data Preprocessing
             st.write("## Data Preprocessing")
             columns_to_drop = st.multiselect("Select columns to drop", df.columns.tolist())
@@ -269,7 +276,10 @@ def main():
             convert_to_category = st.checkbox("Convert categorical columns to category dtype", value=True)
             winsorize_data = st.checkbox("Winsorize numerical columns", value=True)
 
-            df, categorical_cols, numerical_cols = preprocess_data(df, notebook_cells, columns_to_drop, drop_na_all, drop_na_any, impute_numerical, impute_categorical, remove_duplicates, convert_to_category, winsorize_data)
+            df, categorical_cols, numerical_cols = preprocess_data(df, notebook_cells, columns_to_drop, drop_na_all,
+                                                                   drop_na_any, impute_numerical, impute_categorical,
+                                                                   remove_duplicates, convert_to_category,
+                                                                   winsorize_data)
 
             # Provide option to download cleaned dataset
             st.download_button(
