@@ -182,7 +182,7 @@ def multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
 
 def bivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
     st.header("Bivariate Analysis")
-    if numerical_cols and categorical_cols:
+    if numerical_cols and categorical_cols:  # <--- This line may cause the error
         cat_col = st.selectbox("Select categorical column for box plot", categorical_cols.tolist())
         num_col = st.selectbox("Select numerical column for box plot", numerical_cols.tolist())
         st.subheader(f"Box Plot of {num_col} by {cat_col}")
