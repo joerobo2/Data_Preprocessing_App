@@ -157,64 +157,49 @@ def univariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
         notebook_cells.append(nbformat.v4.new_code_cell(f"px.histogram(df, x='{col}')"))
 
 
-# Function for multivariate analysis using Plotly
+# Function for multivariate analysis
 def multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
-    st.write("**Multivariate Analysis**")
-
-    # Pairplot for numerical columns
-    if len(numerical_cols) > 1:
-        st.write("### Pairplot of numerical columns")
-        fig = px.scatter_matrix(df[numerical_cols], title='Scatter Matrix of Numerical Columns')
+    st.write("## Multivariate Analysis")
+    st.write("### Correlation Matrix")
+    
+    if numerical_cols.size > 1:  # Ensure there are enough numerical columns for correlation matrix
+        correlation = df[numerical_cols].corr()
+        fig = px.imshow(correlation, title="Correlation Matrix", color_continuous_scale='Viridis')
         st.plotly_chart(fig)
-        notebook_cells.append(nbformat.v4.new_code_cell("px.scatter_matrix(df[numerical_cols])"))
+        notebook_cells.append(nbformat.v4.new_code_cell("df.corr()"))
 
-    # Correlation heatmap using Plotly
-    st.write("### Correlation Heatmap")
-    correlation_matrix = df[numerical_cols].corr()
-    fig = go.Figure(data=go.Heatmap(
-        z=correlation_matrix.values,
-        x=correlation_matrix.columns,
-        y=correlation_matrix.index,
-        colorscale='Viridis',
-        colorbar=dict(title='Correlation'),
-        zmin=-1,
-        zmax=1
-    ))
-    fig.update_layout(title='Correlation Heatmap', xaxis_title='Variables', yaxis_title='Variables')
-    st.plotly_chart(fig)
-    notebook_cells.append(nbformat.v4.new_code_cell("go.Figure(data=go.Heatmap(...))"))
+    st.write("### Scatter Matrix")
+    if len(numerical_cols) > 1:  # Ensure there are enough numerical columns for scatter matrix
+        fig = px.scatter_matrix(df, dimensions=numerical_cols, title="Scatter Matrix")
+        st.plotly_chart(fig)
+        notebook_cells.append(nbformat.v4.new_code_cell(f"px.scatter_matrix(df, dimensions={list(numerical_cols)})"))
 
 
+# Function for clustering analysis
 def clustering_analysis(df, numerical_cols, notebook_cells):
-    st.write("### Clustering Analysis")
+    st.write("## Clustering Analysis")
+    num_clusters = st.number_input("Select number of clusters", min_value=1, max_value=10, value=3)
     
-    # KMeans Clustering
-    num_clusters = st.slider("Select number of clusters for KMeans", min_value=1, max_value=10, value=3)
-    kmeans = KMeans(n_clusters=num_clusters)
-    
-    # Fitting the model
-    kmeans.fit(df[numerical_cols])
-    
-    # Adding cluster column to the dataframe
-    df['Cluster'] = kmeans.labels_
-    st.success(f"Clustered data into {num_clusters} clusters.")
-    
-    # Plotting the clusters
-    st.write("### Cluster Visualization")
-    fig = px.scatter(df, x=numerical_cols[0], y=numerical_cols[1], color='Cluster', title='Cluster Visualization')
-    st.plotly_chart(fig)
+    if st.button("Run KMeans Clustering"):
+        kmeans = KMeans(n_clusters=num_clusters)
+        kmeans.fit(df[numerical_cols])
+        df['Cluster'] = kmeans.labels_
 
-    # Append code to notebook cells
-    notebook_cells.append(nbformat.v4.new_code_cell(f"""
-    import pandas as pd
-    from sklearn.cluster import KMeans
+        # Visualizing clusters
+        st.write("### Cluster Visualization")
+        fig = px.scatter(df, x=numerical_cols[0], y=numerical_cols[1], color='Cluster', title='Cluster Visualization')
+        st.plotly_chart(fig)
 
-    num_clusters = {num_clusters}
-    kmeans = KMeans(n_clusters=num_clusters)
-    kmeans.fit(df[{numerical_cols}])
-    df['Cluster'] = kmeans.labels_
-""""))
-    
+        # Append code to notebook cells
+        notebook_cells.append(nbformat.v4.new_code_cell(f"""
+        from sklearn.cluster import KMeans
+        num_clusters = {num_clusters}
+        kmeans = KMeans(n_clusters=num_clusters)
+        kmeans.fit(df[{list(numerical_cols)}])
+        df['Cluster'] = kmeans.labels_
+        """))
+
+
 def create_notebook(notebook_cells):
     """Creates a Jupyter Notebook from cells."""
     nb = nbformat.v4.new_notebook()
