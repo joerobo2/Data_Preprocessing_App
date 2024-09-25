@@ -215,10 +215,11 @@ def multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
 
 
 # Function for exporting notebook cells
-def export_notebook_cells(notebook_cells, filename):
+def export_notebook_cells(notebook_cells, filepath):
+    """Export notebook cells to a specified file."""
     nb = nbformat.v4.new_notebook()
     nb.cells = notebook_cells
-    with open(filename, 'w') as f:
+    with open(filepath, 'w') as f:
         nbformat.write(nb, f)
 
 # Main function for the Streamlit app
@@ -240,14 +241,28 @@ def main():
         columns_to_drop = st.multiselect("Select columns to drop:", df.columns.tolist())
 
         df, categorical_cols, numerical_cols = preprocess_data(df, notebook_cells, columns_to_drop)
-        univariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
-        multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
+        
+        # Checkboxes for analysis functions
+        if st.checkbox("Perform Univariate Analysis"):
+            univariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
+        
+        if st.checkbox("Perform Multivariate Analysis"):
+            multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
+        
+        if st.checkbox("Perform Clustering Analysis"):
+            multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)  # Reuse for clustering analysis
+
+        if st.checkbox("Perform T-tests and ANOVA"):
+            statistical_analysis(df, numerical_cols, categorical_cols, notebook_cells)
 
         # Exporting notebook
         export_option = st.checkbox("Export analysis as notebook")
         if export_option:
-            export_notebook_cells(notebook_cells, 'analysis_notebook.ipynb')
-            st.success("Notebook exported successfully!")
+            # Add text input for user to specify the file path
+            file_path = st.text_input("Specify file path to save the notebook (including .ipynb):", 'analysis_notebook.ipynb')
+            if st.button("Save Notebook"):
+                export_notebook_cells(notebook_cells, file_path)
+                st.success(f"Notebook exported successfully to {file_path}!")
 
 if __name__ == "__main__":
     main()
