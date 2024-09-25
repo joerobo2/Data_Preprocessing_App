@@ -239,7 +239,7 @@ def create_notebook(notebook_cells):
 def save_notebook(notebook):
     """Saves the Jupyter notebook to BytesIO and returns the bytes."""
     buffer = BytesIO()
-    nbformat.write(notebook, buffer)
+    nbformat.write(notebook, buffer, format='ipynb')  # Ensure format is specified
     buffer.seek(0)
     return buffer.getvalue()
 
