@@ -28,7 +28,7 @@ def preprocess_data(df, notebook_cells, columns_to_drop):
     removed_rows_all = removed_rows_na = 0
 
     if columns_to_drop:
-        df.drop(columns_to_drop, axis=1, inplace=True)
+        df.drop(columns=columns_to_drop, axis=1, inplace=True)
         st.success(f"Dropped columns: {', '.join(columns_to_drop)}")
         notebook_cells.append(nbformat.v4.new_markdown_cell(f"## Dropped Columns: {', '.join(columns_to_drop)}"))
 
@@ -57,7 +57,8 @@ def preprocess_data(df, notebook_cells, columns_to_drop):
     try:
         categorical_cols = df.select_dtypes(include=['object']).columns
         for col in categorical_cols:
-            df[col] = df[col].fillna(df[col].mode()[0])
+            if col in df.columns:  # Ensure column exists before filling
+                df[col] = df[col].fillna(df[col].mode()[0])
         imputed_categorical = df[categorical_cols].isnull().sum().sum()
     except Exception as e:
         st.error(f"Error imputing missing categorical values: {e}")
@@ -71,22 +72,22 @@ def preprocess_data(df, notebook_cells, columns_to_drop):
         st.error(f"Error removing duplicate rows: {e}")
         removed_duplicates = 0
 
-    try:
-        for col in categorical_cols:
-            if df[col].nunique() / len(df) < 0.5:
-                df[col] = df[col].astype('category')
-    except Exception as e:
-        st.error(f"Error converting columns to category type: {e}")
+    # Convert categorical columns to category type if necessary
+    for col in categorical_cols:
+        if col in df.columns and df[col].nunique() / len(df) < 0.5:
+            df[col] = df[col].astype('category')
 
+    # Winsorization process
     winsorized_rows = []
     winsorize_limits = [0.05, 0.05]
     try:
         for col in numerical_cols:
-            original_data = df[col].copy()
-            df[col] = winsorize(df[col], limits=winsorize_limits)
-            winsorized_diff = (original_data != df[col]).sum()
-            if winsorized_diff > 0:
-                winsorized_rows.append(winsorized_diff)
+            if col in df.columns:  # Ensure column exists before winsorizing
+                original_data = df[col].copy()
+                df[col] = winsorize(df[col], limits=winsorize_limits)
+                winsorized_diff = (original_data != df[col]).sum()
+                if winsorized_diff > 0:
+                    winsorized_rows.append(winsorized_diff)
     except Exception as e:
         st.error(f"Error winsorizing data: {e}")
 
@@ -105,33 +106,23 @@ def preprocess_data(df, notebook_cells, columns_to_drop):
         "imputed_numerical = df[numerical_cols].isnull().sum().sum()\n\n"
         "categorical_cols = df.select_dtypes(include=['object']).columns\n"
         "for col in categorical_cols:\n"
-        "    df[col].fillna(df[col].mode()[0], inplace=True)\n"
+        "    if col in df.columns:\n"
+        "        df[col] = df[col].fillna(df[col].mode()[0])\n"
         "imputed_categorical = df[categorical_cols].isnull().sum().sum()\n\n"
         "initial_rows = len(df)\n"
         "df.drop_duplicates(inplace=True)\n"
         "removed_duplicates = initial_rows - len(df)\n\n"
         "for col in categorical_cols:\n"
-        "    if df[col].nunique() / len(df) < 0.5:\n"
+        "    if col in df.columns and df[col].nunique() / len(df) < 0.5:\n"
         "        df[col] = df[col].astype('category')\n\n"
         "from scipy.stats.mstats import winsorize\n"
         "for col in numerical_cols:\n"
-        "    df[col] = winsorize(df[col], limits=[0.05, 0.05])"
+        "    if col in df.columns:\n"
+        "        df[col] = winsorize(df[col], limits=[0.05, 0.05])"
     ))
 
     notebook_cells.append(nbformat.v4.new_markdown_cell(f"- Removed {removed_rows_all} rows with all missing values."))
     notebook_cells.append(nbformat.v4.new_markdown_cell(f"- Removed {removed_rows_na} rows with missing values."))
-    notebook_cells.append(nbformat.v4.new_markdown_cell(
-        f"- Imputed {imputed_numerical} missing numerical values." if imputed_numerical > 0 else "- No missing numerical values imputed."))
-    notebook_cells.append(nbformat.v4.new_markdown_cell(
-        f"- Imputed {imputed_categorical} missing categorical values." if imputed_categorical > 0 else "- No missing categorical values imputed."))
-    notebook_cells.append(nbformat.v4.new_markdown_cell(
-        f"- Removed {removed_duplicates} duplicate rows." if removed_duplicates > 0 else "- No duplicate rows removed."))
-    notebook_cells.append(nbformat.v4.new_markdown_cell(
-        f"- Winsorized: {len(winsorized_rows)} rows, {len(numerical_cols)} cols using limits {winsorize_limits}."))
-
-    st.write("**Preprocessing Summary**")
-    st.markdown(f"- Removed {removed_rows_all} rows with all missing values.")
-    st.markdown(f"- Removed {removed_rows_na} rows with missing values.")
     imputation_summary = [
         f"- Imputed {imputed_numerical} missing numerical values." if imputed_numerical > 0 else "- No missing numerical values imputed.",
         f"- Imputed {imputed_categorical} missing categorical values." if imputed_categorical > 0 else "- No missing categorical values imputed.",
