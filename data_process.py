@@ -12,10 +12,14 @@ import os
 import nbformat
 
 
-def import_notebook(filepath):
-    if not os.path.exists(filepath):
-        raise FileNotFoundError(f"File not found: {filepath}")
-    return pd.read_csv(filepath)
+def import_notebook(uploaded_file):
+    """Function to import CSV from BytesIO object."""
+    try:
+        df = pd.read_csv(uploaded_file)
+        return df
+    except Exception as e:
+        st.error(f"Error reading the uploaded file: {e}")
+        return None
 
 
 def preprocess_data(df, notebook_cells, columns_to_drop):
@@ -179,61 +183,46 @@ def univariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
         ))
 
 
-def bivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
-    st.header("Bivariate Analysis")
-    # KMeans Clustering for Numerical Variables
-    kmeans_results = {}
-    for col in numerical_cols:
-        st.subheader(f"KMeans Clustering on {col}")
-        kmeans = KMeans(n_clusters=3)
-        df['Cluster'] = kmeans.fit_predict(df[[col]])
-        fig, ax = plt.subplots()
-        sns.scatterplot(x=df.index, y=col, hue='Cluster', data=df, ax=ax)
+def multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
+    st.header("Multivariate Analysis")
+    pair_plot_cols = st.multiselect("Select columns for pair plot", numerical_cols.tolist())
+    if pair_plot_cols:
+        st.subheader("Pair Plot")
+        fig = sns.pairplot(df[pair_plot_cols])
         st.pyplot(fig)
-        kmeans_results[col] = df['Cluster'].value_counts()
-        notebook_cells.append(nbformat.v4.new_markdown_cell(f"### KMeans Clustering on {col}"))
+        notebook_cells.append(nbformat.v4.new_markdown_cell("### Pair Plot"))
+        notebook_cells.append(nbformat.v4.new_code_cell(f"sns.pairplot(df[{pair_plot_cols}])"))
+
+    if len(numerical_cols) >= 2:
+        x_col = st.selectbox("Select X column for scatter plot", numerical_cols.tolist())
+        y_col = st.selectbox("Select Y column for scatter plot", numerical_cols.tolist())
+        st.subheader(f"Scatter Plot of {x_col} vs {y_col}")
+        fig, ax = plt.subplots()
+        sns.scatterplot(x=x_col, y=y_col, data=df, ax=ax)
+        st.pyplot(fig)
+        notebook_cells.append(nbformat.v4.new_markdown_cell(f"### Scatter Plot of {x_col} vs {y_col}"))
         notebook_cells.append(nbformat.v4.new_code_cell(
-            f"kmeans = KMeans(n_clusters=3)\n"
-            f"df['Cluster'] = kmeans.fit_predict(df[['{col}']])\n"
             f"fig, ax = plt.subplots()\n"
-            f"sns.scatterplot(x=df.index, y='{col}', hue='Cluster', data=df, ax=ax)\n"
-            f"plt.show()"
+            f"sns.scatterplot(x='{x_col}', y='{y_col}', data=df, ax=ax)\n"
+            f"fig.show()"
         ))
 
-    # ANOVA Test between categorical and numerical variables
-    anova_results = {}
-    for cat_col in categorical_cols:
-        for num_col in numerical_cols:
-            F, p = stats.f_oneway(*(df[num_col][df[cat_col] == category] for category in df[cat_col].unique()))
-            anova_results[(cat_col, num_col)] = (F, p)
 
-    # T-tests for numerical variables by categorical variables
-    ttest_results = {}
-    for cat_col in categorical_cols:
-        for num_col in numerical_cols:
-            categories = df[cat_col].unique()
-            if len(categories) == 2:  # Perform t-test only if there are 2 categories
-                t_stat, p_val = stats.ttest_ind(df[num_col][df[cat_col] == categories[0]],
-                                                 df[num_col][df[cat_col] == categories[1]])
-                ttest_results[(cat_col, num_col)] = (t_stat, p_val)
-
-    # Display ANOVA results
-    st.subheader("ANOVA Results")
-    anova_df = pd.DataFrame(anova_results).T.reset_index()
-    anova_df.columns = ['Categorical Variable', 'Numerical Variable', 'F-statistic', 'p-value']
-    st.write(anova_df)
-
-    # Display T-test results
-    st.subheader("T-test Results")
-    ttest_df = pd.DataFrame(ttest_results).T.reset_index()
-    ttest_df.columns = ['Categorical Variable', 'Numerical Variable', 't-statistic', 'p-value']
-    st.write(ttest_df)
-
-    notebook_cells.append(nbformat.v4.new_markdown_cell("## Bivariate Analysis Summary"))
-    notebook_cells.append(nbformat.v4.new_markdown_cell("### ANOVA Results"))
-    notebook_cells.append(nbformat.v4.new_code_cell("anova_df"))
-    notebook_cells.append(nbformat.v4.new_markdown_cell("### T-test Results"))
-    notebook_cells.append(nbformat.v4.new_code_cell("ttest_df"))
+def bivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
+    st.header("Bivariate Analysis")
+    if numerical_cols and categorical_cols:
+        cat_col = st.selectbox("Select categorical column for box plot", categorical_cols.tolist())
+        num_col = st.selectbox("Select numerical column for box plot", numerical_cols.tolist())
+        st.subheader(f"Box Plot of {num_col} by {cat_col}")
+        fig, ax = plt.subplots()
+        sns.boxplot(x=cat_col, y=num_col, data=df, ax=ax)
+        st.pyplot(fig)
+        notebook_cells.append(nbformat.v4.new_markdown_cell(f"### Box Plot of {num_col} by {cat_col}"))
+        notebook_cells.append(nbformat.v4.new_code_cell(
+            f"fig, ax = plt.subplots()\n"
+            f"sns.boxplot(x='{cat_col}', y='{num_col}', data=df, ax=ax)\n"
+            f"fig.show()"
+        ))
 
 
 def main():
@@ -248,16 +237,20 @@ def main():
     uploaded_file = st.file_uploader("Upload your CSV file", type=["csv"])
     if uploaded_file is not None:
         df = import_notebook(uploaded_file)
-        
-        # Data Preprocessing
-        columns_to_drop = st.multiselect("Select columns to drop", df.columns.tolist())
-        df, categorical_cols, numerical_cols = preprocess_data(df, notebook_cells, columns_to_drop)
-        
-        # Univariate Analysis
-        univariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
-        
-        # Bivariate Analysis
-        bivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
+        if df is not None:  # Proceed only if the DataFrame is valid
+            # Data Preprocessing
+            columns_to_drop = st.multiselect("Select columns to drop", df.columns.tolist())
+            df, categorical_cols, numerical_cols = preprocess_data(df, notebook_cells, columns_to_drop)
+            
+            # Univariate Analysis
+            univariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
+            
+            # Bivariate Analysis
+            bivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
+            
+            # Multivariate Analysis
+            multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
+
 
 if __name__ == "__main__":
     main()
