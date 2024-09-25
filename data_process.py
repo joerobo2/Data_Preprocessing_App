@@ -244,10 +244,12 @@ def save_notebook(notebook):
     """Saves the Jupyter notebook to BytesIO and returns the bytes."""
     buffer = BytesIO()
 
-    # Write the notebook to the buffer.
-    nbformat.write(notebook, buffer, version=4)
+    # Write the notebook to the buffer without specifying format
+    notebook_content = nbformat.writes(notebook).encode('utf-8')
 
+    buffer.write(notebook_content)
     buffer.seek(0)  # Reset the buffer position to the beginning
+
     return buffer.getvalue()  # Return the byte content of the buffer
 
 
