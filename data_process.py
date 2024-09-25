@@ -97,8 +97,8 @@ def preprocess_data(df, notebook_cells, columns_to_drop):
                     winsorized_diff = (original_data != df[col]).sum()
                 if winsorized_diff > 0:
                     winsorized_rows.append(winsorized_diff)
-                except Exception as e:
-                    st.error(f"Error winsorizing data: {e}")
+    except Exception as e:
+       st.error(f"Error winsorizing data: {e}")
 
     preprocess_time = time.time() - start_time
     st.write(f"Preprocessing took {preprocess_time:.2f} seconds")
