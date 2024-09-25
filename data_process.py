@@ -186,89 +186,12 @@ def multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells):
     st.write("### Correlation heatmap")
     correlation_matrix = df[numerical_cols].corr()
     fig, ax = plt.subplots()
-    sns.heatmap(correlation_matrix, annot=True, fmt=".2f", cmap='coolwarm', ax=ax)
+    sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', ax=ax)
     st.pyplot(fig)
-    notebook_cells.append(nbformat.v4.new_code_cell("sns.heatmap(correlation_matrix, annot=True, fmt='.2f', cmap='coolwarm')"))
+    notebook_cells.append(nbformat.v4.new_code_cell("sns.heatmap(df[numerical_cols].corr(), annot=True, cmap='coolwarm')"))
 
-    # Clustering Analysis
-    st.write("### Clustering Analysis")
-    n_clusters = st.number_input("Number of Clusters:", min_value=1, max_value=10, value=3)
-    kmeans = KMeans(n_clusters=n_clusters, random_state=42)
-    df['cluster'] = kmeans.fit_predict(df[numerical_cols])
 
-    # Visualizing clusters
-    fig, ax = plt.subplots()
-    ax.scatter(df[numerical_cols[0]], df[numerical_cols[1]], c=df['cluster'], cmap='viridis', s=50)
-    ax.set_xlabel(numerical_cols[0])
-    ax.set_ylabel(numerical_cols[1])
-    ax.set_title(f'KMeans Clustering with {n_clusters} clusters')
-    st.pyplot(fig)
-
-    notebook_cells.append(nbformat.v4.new_code_cell(
-        f"kmeans = KMeans(n_clusters={n_clusters}, random_state=42)\n"
-        f"df['cluster'] = kmeans.fit_predict(df[numerical_cols])\n"
-        f"fig, ax = plt.subplots()\n"
-        f"ax.scatter(df['{numerical_cols[0]}'], df['{numerical_cols[1]}'], c=df['cluster'], cmap='viridis', s=50)\n"
-        f"ax.set_xlabel('{numerical_cols[0]}')\n"
-        f"ax.set_ylabel('{numerical_cols[1]}')\n"
-        f"ax.set_title('KMeans Clustering')"
-    ))
-
-def statistical_analysis(df, numerical_cols, categorical_cols, notebook_cells):
-    """Perform statistical analysis and add results to notebook cells."""
-    
-    # Initialize lists to store results
-    ttest_results = []
-    anova_results = []
-
-    # T-test analysis
-    for num_col in numerical_cols:
-        for cat_col in categorical_cols:
-            # Example statistical test (t-test)
-            groups = [df[num_col][df[cat_col] == cat_val] for cat_val in df[cat_col].unique()]
-            if len(groups) == 2:  # Ensure there are two groups for t-test
-                t_stat, p_value = stats.ttest_ind(*groups)
-                ttest_results.append({
-                    "Numerical Column": num_col,
-                    "Categorical Column": cat_col,
-                    "t-statistic": t_stat,
-                    "p-value": p_value
-                })
-
-    # ANOVA analysis
-    for num_col in numerical_cols:
-        for cat_col in categorical_cols:
-            # Example statistical test (ANOVA)
-            groups = [df[num_col][df[cat_col] == cat_val] for cat_val in df[cat_col].unique()]
-            if len(groups) > 1:  # Ensure there are more than one group for ANOVA
-                f_stat, p_value = stats.f_oneway(*groups)
-                anova_results.append({
-                    "Numerical Column": num_col,
-                    "Categorical Column": cat_col,
-                    "F-statistic": f_stat,
-                    "p-value": p_value
-                })
-
-    # Display summary of t-test results in a table
-    if ttest_results:
-        st.write("**T-test Results Summary**")
-        ttest_df = pd.DataFrame(ttest_results)
-        st.table(ttest_df)
-
-    # Display summary of ANOVA results in a table
-    if anova_results:
-        st.write("**ANOVA Results Summary**")
-        anova_df = pd.DataFrame(anova_results)
-        st.table(anova_df)
-
-    # Append results to notebook cells
-    notebook_cells.append(nbformat.v4.new_markdown_cell("## T-test Results"))
-    notebook_cells.append(nbformat.v4.new_code_cell("import pandas as pd\n" + ttest_df.to_string(index=False)))
-    
-    notebook_cells.append(nbformat.v4.new_markdown_cell("## ANOVA Results"))
-    notebook_cells.append(nbformat.v4.new_code_cell("import pandas as pd\n" + anova_df.to_string(index=False)))
-
-# Exporting the Notebook Function
+# Function to export the notebook
 def export_notebook_cells(notebook_cells):
     """Export notebook cells to a .ipynb file in memory."""
     nb = nbformat.v4.new_notebook()
@@ -276,45 +199,41 @@ def export_notebook_cells(notebook_cells):
     
     # Use BytesIO to hold the notebook data in memory
     with io.BytesIO() as buf:
-        nbformat.write(nb, buf)
-        buf.seek(0)  # Go to the start of the BytesIO buffer
+        nbformat.write(nb, buf)  # Write to the buffer
+        buf.seek(0)  # Move to the beginning of the buffer
         return buf.getvalue()  # Return the bytes of the notebook
-        
-# Main function for the Streamlit app
+
+
+# Main Streamlit application
 def main():
-    # Embed the updated banner image
-    banner_path = "EDA App Banner.png"  # Update to the correct path
-    st.image(banner_path, use_column_width=True)
+    st.title("Data Analysis App")
     
-    # Title
-    st.title("Data Preprocessing and Analysis App")
+    uploaded_file = st.file_uploader("Upload a CSV file", type=["csv"])
     
-    uploaded_file = st.file_uploader("Upload CSV File", type=["csv"])
+    notebook_cells = []  # This will store all the notebook cells for export
+
     if uploaded_file is not None:
-        notebook_cells = []
+        df = import_notebook(uploaded_file)
+        notebook_cells.append(nbformat.v4.new_markdown_cell("# Data Analysis"))
 
-        # Add dataset reading cell
-        notebook_cells.append(nbformat.v4.new_code_cell("df = pd.read_csv('uploaded_file.csv')"))
+        # Preprocessing section
+        st.header("Preprocessing")
+        columns_to_drop = st.multiselect("Select columns to drop", df.columns.tolist())
+        df, categorical_cols, numerical_cols = preprocess_data(df, notebook_cells, columns_to_drop)
 
-        df = import_notebook(uploaded_file)  # Ensure you have this function defined
-        columns_to_drop = st.multiselect("Select columns to drop:", df.columns.tolist())
+        # Univariate analysis section
+        st.header("Univariate Analysis")
+        univariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
 
-        df, categorical_cols, numerical_cols = preprocess_data(df, notebook_cells, columns_to_drop)  # Ensure this function is defined
+        # Multivariate analysis section
+        st.header("Multivariate Analysis")
+        multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)
 
-        # Checkboxes for analysis functions
-        if st.checkbox("Perform Univariate Analysis"):
-            univariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)  # Ensure this is defined
-
-        if st.checkbox("Perform Multivariate Analysis"):
-            multivariate_analysis(df, categorical_cols, numerical_cols, notebook_cells)  # Ensure this is defined
-
-        if st.checkbox("Perform T-tests and ANOVA"):
-            statistical_analysis(df, numerical_cols, categorical_cols, notebook_cells)
-
-        # Replace the save notebook functionality with download
+        # Export notebook button
         if st.button("Export Notebook"):
             try:
                 notebook_bytes = export_notebook_cells(notebook_cells)
+                print(type(notebook_bytes))  # Debugging: check the type of notebook_bytes
                 # Create a download button
                 st.download_button(
                     label="Download Notebook",
@@ -326,6 +245,7 @@ def main():
             except Exception as e:
                 st.error(f"Error preparing notebook for download: {e}")
                 print(e)  # Print the error message
+
 
 if __name__ == "__main__":
     main()
