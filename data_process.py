@@ -224,9 +224,10 @@ from sklearn.cluster import KMeans
 
 num_clusters = {num_clusters}
 kmeans = KMeans(n_clusters=num_clusters)
-kmeans.fit(df[{numerical_cols}])
+kmeans.fit(df[{', '.join(repr(col) for col in numerical_cols)}])
 df['Cluster'] = kmeans.labels_
-""""))
+"""))
+
     
 def create_notebook(notebook_cells):
     """Creates a Jupyter Notebook from cells."""
